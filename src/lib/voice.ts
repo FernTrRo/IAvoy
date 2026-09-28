@@ -11,7 +11,11 @@ import { SpeechRecognition } from "@capacitor-community/speech-recognition"
 const LANG = "es-MX"
 const isNative = Capacitor.isNativePlatform()
 let activeRecognition: WebRecognition | undefined
+let cancelRecognition: (() => void) | undefined
+let listenVersion = 0
 export async function stopListening() {
+  listenVersion++
+  cancelRecognition?.()
   if (isNative) await SpeechRecognition.stop()
   else activeRecognition?.stop()
 }
@@ -113,20 +117,28 @@ export function canListen() {
 
 /** Escucha una sola frase y devuelve el texto. */
 export async function listenOnce(): Promise<string> {
+  const version = ++listenVersion
   if (isNative) {
     const { available } = await SpeechRecognition.available()
     if (!available) throw new Error("El reconocimiento de voz no está disponible en este teléfono.")
+    if (version !== listenVersion) return ""
     const perm = await SpeechRecognition.requestPermissions()
     if (perm.speechRecognition !== "granted") throw new Error("Hace falta permiso para usar el micrófono.")
-    const res = await SpeechRecognition.start({
-      language: LANG,
-      maxResults: 1,
-      partialResults: false,
-      popup: false,
+    if (version !== listenVersion) return ""
+    return new Promise<string>((resolve, reject) => {
+      const finish = (text: string, error?: Error) => {
+        clearTimeout(timeout)
+        if (cancelRecognition === cancel) cancelRecognition = undefined
+        if (error) reject(error); else resolve(text)
+      }
+      const cancel = () => finish("")
+      // Las pausas son normales al hablar despacio: dejamos hasta 45 s en total.
+      const timeout = setTimeout(() => { void SpeechRecognition.stop(); finish("", new Error("Se agotó la escucha. Toca el micrófono para intentarlo otra vez.")) }, 45000)
+      cancelRecognition = cancel
+      SpeechRecognition.start({ language: LANG, maxResults: 1, partialResults: false, popup: false })
+        .then(res => finish(res.matches?.[0] ?? ""), error => finish("", error instanceof Error ? error : new Error("No se pudo escuchar.")))
     })
-    return res.matches?.[0] ?? ""
   }
-
   const Ctor = getWebRecognition()
   if (!Ctor) throw new Error("Este navegador no puede escuchar. Prueba en Chrome o Edge, o escribe el aviso.")
   const rec = new Ctor()
@@ -136,13 +148,28 @@ export async function listenOnce(): Promise<string> {
   rec.maxAlternatives = 1
   return new Promise<string>((resolve, reject) => {
     let text = ""
-    rec.onresult = (e) => {
-      text = e.results[0]?.[0]?.transcript ?? ""
+    let settled = false
+    let graceTimer: ReturnType<typeof setTimeout> | undefined
+    const finish = (error?: Error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      if (graceTimer) clearTimeout(graceTimer)
+      if (activeRecognition === rec) activeRecognition = undefined
+      if (cancelRecognition === cancel) cancelRecognition = undefined
+      if (error) reject(error); else resolve(text)
     }
-    rec.onerror = (e) =>
-      reject(new Error(e.error === "not-allowed" ? "Hace falta permiso para usar el micrófono." : "No se escuchó bien. Intenta otra vez."))
-    const timeout = setTimeout(() => { rec.stop(); reject(new Error("Se agotó el tiempo de escucha. Inténtalo otra vez.")) }, 20000)
-    rec.onend = () => { clearTimeout(timeout); activeRecognition = undefined; resolve(text) }
-    rec.start()
+    const cancel = () => { text = ""; rec.stop(); finish() }
+    // SpeechRecognition termina al detectar silencio; esperamos cinco segundos
+    // antes de cerrar para que la persona pueda pensar y continuar con calma.
+    const timeout = setTimeout(() => { rec.stop(); finish(new Error("Se agotó el tiempo de escucha. Inténtalo otra vez.")) }, 45000)
+    cancelRecognition = cancel
+    rec.onresult = e => { text = e.results[0]?.[0]?.transcript ?? "" }
+    rec.onerror = e => finish(new Error(e.error === "not-allowed" ? "Hace falta permiso para usar el micrófono." : "No se escuchó bien. Intenta otra vez."))
+    rec.onend = () => {
+      if (settled) return
+      graceTimer = setTimeout(() => finish(), 5000)
+    }
+    try { rec.start() } catch (error) { finish(error instanceof Error ? error : new Error("No se pudo iniciar el micrófono.")) }
   })
 }

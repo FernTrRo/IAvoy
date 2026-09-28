@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { VoiceCommand } from "@/components/voice-command"
-import { normalize } from "@/lib/reminders"
+import { isIntent, reminderTarget, speechText } from "@/lib/commands"
 import { Check, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -31,17 +31,19 @@ export function RemindersScreen({ onEdit, onCancel, reminders, onBack, onDone, o
 
       <Button onClick={onNew}><Plus /> Crear aviso</Button>
       <VoiceCommand hint="Di modificar seguido del nombre del aviso, o cancelar seguido de su nombre." onCommand={text => {
-        const command = normalize(text)
+        const command = text
         if (cancelId) {
-          if (command === "si" || command === "si cancelar") { onCancel(cancelId); setCancelId(null) }
-          else if (command === "no") setCancelId(null)
+          if (isIntent(command, "yes")) { onCancel(cancelId); setCancelId(null) }
+          else if (isIntent(command, "no")) setCancelId(null)
           else throw new Error("Di sí para cancelar el aviso o no para conservarlo.")
           return
         }
-        const match = command.match(/^(modificar|editar|cancelar) (.+)$/)
-        const matches = match ? pending.filter(r => normalize(r.text) === match[2]) : []
-        if (!match || matches.length !== 1) throw new Error("Usa el nombre completo. Si hay avisos con el mismo nombre, elige uno con su botón.")
-        if (match[1] === "cancelar") setCancelId(matches[0].id)
+        if (isIntent(command, "new")) { onNew(); return }
+        if (isIntent(command, "back")) { onBack(); return }
+        const match = reminderTarget(command)
+        const matches = match ? pending.filter(r => speechText(r.text) === match.name) : []
+        if (!match || matches.length !== 1) throw new Error("Di cambiar o quitar, seguido del nombre del aviso. Si hay nombres iguales, elige su botón.")
+        if (match.action === "cancel") setCancelId(matches[0].id)
         else onEdit(matches[0].id)
       }} />
       {cancelId && <Card role="alert"><p>¿Cancelar el aviso «{reminders.find(r => r.id === cancelId)?.text}»?</p><Button onClick={() => { onCancel(cancelId); setCancelId(null) }}>Sí, cancelar aviso</Button><Button variant="outline" onClick={() => setCancelId(null)}>No, conservar</Button></Card>}

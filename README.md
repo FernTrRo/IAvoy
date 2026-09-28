@@ -35,25 +35,27 @@ Para llevar estos cambios a otra computadora, copia esta carpeta sin `node_modul
 
 ## Probar la voz
 
-Toca **Hablar** antes de cada frase. El botón pasa a **Detener escucha**. Permite el micrófono cuando el navegador lo solicite. La compatibilidad y conexión necesarias dependen del motor de voz del dispositivo. El navegador integrado puede no ofrecer reconocimiento.
+Un único micrófono circular de 96 px permanece fijo en todas las pantallas, incluida la ayuda y los avisos. Gris = apagado, verde = escuchando, ámbar = procesando, coral = error. El texto y el icono también indican el estado. Tócalo para iniciar y otra vez para cancelar la escucha. No escucha permanentemente ni desde otras aplicaciones.
 
-Ejemplo de creación:
+Puedes decir desde inicio: **“Recuérdame llamar a mi hija mañana a las diez de la mañana, todos los días”**. La tarea, fecha, hora y recurrencia se capturan juntas. Revisa el resumen y di **“guardar”**, **“confirma”** o **“así está bien”**. No se guarda automáticamente por el dictado.
 
-1. Inicio: `crear aviso`.
-2. Contenido: `Llamar a mi hija`.
-3. `siguiente`.
-4. `mañana a las diez de la mañana` o `dentro de cinco minutos`.
-5. `avísame quince minutos antes` o `sin anticipación`.
-6. Opcionales: `todos los días`, `cada semana`, `una sola vez`, `repetir tres veces`, `posponer diez minutos`.
-7. Revisa el resumen y di `guardar`.
+También funciona: “hacer un aviso para regar las plantas dentro de cinco minutos”, o “crear un aviso para llamar mañana a las diez de la mañana y avísame quince minutos antes”. La frecuencia por defecto es una sola vez. “Todos los días”, “a diario” y “cada día” son equivalentes; “cada semana” activa frecuencia semanal.
 
-En Mis avisos: `modificar Llamar a mi hija` o `cancelar Llamar a mi hija`. Al editar, `texto Llamar a mi hermana` cambia el contenido. Si hay nombres duplicados, elige el aviso con su botón.
+Si dices “a las diez” sin especificar período, pide mañana/tarde/noche; conserva el contenido y acepta “de la tarde” como aclaración. No adivina fechas o recurrencias no soportadas. Puedes escribir la frase en el mismo formulario y usar “Corregir datos a mano” para fechas de calendario y opciones adicionales.
 
-En una guía: `siguiente`, `atrás`, `repite`, `más despacio`, `pausar`. En el catálogo, di el título completo para abrirla. Cambiar de guía conserva el progreso.
+Variantes de comandos:
 
-Cuando aparece un aviso: `listo`, `más tarde`, `posponer cinco minutos` o `silenciar`. Después de la última repetición, se cierra el aviso y se conserva como pendiente; silenciar no significa completar. En avisos recurrentes, al silenciar o agotar repeticiones se programa la siguiente fecha futura.
+- Crear: crear aviso, nuevo aviso, hacer aviso, haz un recordatorio, ponme un aviso, recuérdame.
+- Navegación: mis avisos, ver pendientes, mis actividades, aprender, mi perfil, volver.
+- Avisos: cambiar/editar/modificar seguido de su nombre; quitar/borrar/cancelar seguido del nombre pide confirmación.
+- Guías: sigue, siguiente, avanza, ya está; atrás, anterior, vuelve al paso anterior; repite, otra vez, no entendí; más lento; pausar, luego sigo.
+- Aviso activo: listo, hecho, ya lo hice; después, más tarde, posponer cinco minutos; silencio, deja de hablar.
+- Ayuda: ayuda o ayúdame lee una indicación contextual. En la ventana de ayuda, llamar a mi tutor abre el marcador.
+- Nombres: wasa/guasap/wasap se reconocen como WhatsApp; yutu/yutub como YouTube. YouTube se identifica, pero su guía aún no existe; se informa de ello.
 
-El reconocimiento de fecha tiene una gramática acotada (hoy, mañana, pasado mañana o dentro de minutos/horas). Para otras fechas, utiliza el calendario. No se interpreta lenguaje libre con un modelo de IA todavía.
+El catálogo tiene diseño de cuaderno y cada actividad conserva su avance. Usa el micrófono o toca la actividad completa. No hay botones Hablar en cada pantalla.
+
+La interpretación utiliza reglas y sinónimos, todavía no un modelo de lenguaje. Los ejemplos describen los formatos probados; no se promete comprender cualquier frase. El motor de voz requiere permisos y puede necesitar conexión. Chrome/Edge o el teléfono ofrecen distinta disponibilidad.
 
 ## Lo que queda pendiente
 
@@ -71,7 +73,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-Las pruebas cubren fechas ambiguas o inválidas, medianoche, anticipación, posposición y recurrencia. La compilación web no sustituye pruebas de micrófono y voz en un teléfono.
+Las pruebas cubren sinónimos, nombres coloquiales, frases completas, fechas ambiguas o inválidas, medianoche, anticipación, posposición y recurrencia. La compilación web no sustituye pruebas de micrófono y voz en un teléfono.
 
 ## Android
 

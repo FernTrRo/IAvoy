@@ -7,7 +7,7 @@ import { ScreenHeader } from "@/components/screen-header"
 import { VoiceCommand } from "@/components/voice-command"
 import type { Profile } from "@/lib/profile"
 import { guides } from "@/data/demo"
-import { normalize } from "@/lib/reminders"
+import { isIntent, speechText, guideTopic } from "@/lib/commands"
 
 export function SettingsScreen({ profile, onSave, onBack }: { profile: Profile; onSave: (p: Profile) => void; onBack: () => void }) {
   const [draft, setDraft] = useState(profile)
@@ -19,12 +19,14 @@ export function SettingsScreen({ profile, onSave, onBack }: { profile: Profile; 
     onSave({ ...draft, name: draft.name.trim(), tutorPhone: phone })
   }
   function command(raw: string) {
-    const s = normalize(raw)
-    if (s === "guardar") { save(); return }
+    const s = speechText(raw)
+    if (isIntent(raw, "save")) { save(); return }
+    if (isIntent(raw, "back") || isIntent(raw, "close")) { onBack(); return }
     for (const [prefix, key] of [["mi nombre es ", "name"], ["mi telefono es ", "phoneModel"], ["mi rutina es ", "routine"], ["mi tutor se llama ", "tutorName"]] as const) {
       if (s.startsWith(prefix)) { setDraft({ ...draft, [key]: raw.slice(prefix.length) }); return }
     }
-    const guide = guides.find(g => s === `sugerir ${normalize(g.title)}` || s === `no sugerir ${normalize(g.title)}`)
+    const topic = guideTopic(s)
+    const guide = guides.find(g => (topic === g.id && /^(?:no )?(?:sugerir|sugiere|recomendar|recomienda|me interesa|agrega)/.test(s)) || s === `sugerir ${speechText(g.title)}` || s === `no sugerir ${speechText(g.title)}`)
     if (guide) { setDraft({ ...draft, interests: s.startsWith("no ") ? draft.interests.filter(id => id !== guide.id) : [...new Set([...draft.interests, guide.id])] }); return }
     throw new Error("Di: mi nombre es…, mi teléfono es…, mi rutina es…, o guardar.")
   }

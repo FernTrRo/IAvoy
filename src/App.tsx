@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
+import { VoiceProvider } from "@/components/voice-command"
 import { Toaster } from "@/components/ui/sonner"
 import { ReminderAlert } from "@/components/reminder-alert"
 import { HomeScreen } from "@/screens/home"
@@ -16,7 +17,7 @@ import { formatWhen } from "@/lib/format"
 
 type Screen =
   | { name: "home" }
-  | { name: "new"; id?: string }
+  | { name: "new"; id?: string; phrase?: string }
   | { name: "settings" }
   | { name: "list" }
   | { name: "guides" }
@@ -37,6 +38,15 @@ export default function App() {
 
   useEffect(() => { save("dailyQuestion", dailyQuestion) }, [dailyQuestion])
   useEffect(() => { window.scrollTo(0, 0) }, [screen])
+
+  useEffect(() => {
+    const goHome = () => {
+      setAlerting(null)
+      setScreen({ name: "home" })
+    }
+    window.addEventListener("iarecuerdo:home-confirmed", goHome)
+    return () => window.removeEventListener("iarecuerdo:home-confirmed", goHome)
+  }, [])
 
 
   useEffect(() => {
@@ -97,7 +107,7 @@ export default function App() {
   }, [dailyQuestion, dailyShown, screen.name, alerting])
 
   return (
-    <div className="safe-area mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5">
+    <VoiceProvider><div className="safe-area mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5">
       {screen.name === "home" && (
         <HomeScreen
           userName={profile.name}
@@ -106,12 +116,12 @@ export default function App() {
           pendingCount={pending.length}
           dailyQuestion={dailyQuestion}
           onDailyQuestion={setDailyQuestion}
-          onNewReminder={() => setScreen({ name: "new" })}
+          onNewReminder={phrase => setScreen({ name: "new", phrase })}
           onGuide={() => setScreen({ name: "guides" })}
           onList={() => setScreen({ name: "list" })}
         />
       )}
-      {screen.name === "new" && <NewReminderScreen key={screen.id ?? "new"} initial={reminders.find(r => r.id === screen.id)} onCancel={() => setScreen({ name: "home" })} onSave={addReminder} />}
+      {screen.name === "new" && <NewReminderScreen key={screen.id ?? "new"} initialPhrase={screen.phrase} initial={reminders.find(r => r.id === screen.id)} onCancel={() => setScreen({ name: "home" })} onSave={addReminder} />}
       {screen.name === "list" && (
         <RemindersScreen
           onEdit={id => setScreen({ name: "new", id })}
@@ -143,6 +153,6 @@ export default function App() {
       {screen.name === "settings" && <SettingsScreen profile={profile} onSave={saveProfile} onBack={() => setScreen({ name: "home" })} />}
       <ReminderAlert reminder={alerting} onDone={markDone} onLater={snooze} onDismiss={dismiss} />
       <Toaster />
-    </div>
+    </div></VoiceProvider>
   )
 }

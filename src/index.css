@@ -16,7 +16,7 @@
   --linea: #5b6b82; /* bordes visibles, contraste ≥ 3:1 */
 
   /* mapeo a variables de shadcn */
-  --radius: 1rem;
+  --radius: .35rem;
   --background: var(--fondo);
   --foreground: var(--texto);
   --card: #ffffff;
@@ -99,8 +99,80 @@
   }
 }
 
+/* Lenguaje visual del cuaderno: superficies con esquinas discretas y controles fáciles de apuntar. */
+button:not(.voice-orb), input, textarea, select, [role="button"] { border-radius: 6px; }
+.rounded-xl, .rounded-2xl, .rounded-lg { border-radius: 6px !important; }
+
 /* respeta la barra de estado / gestos del teléfono */
 .safe-area {
   padding-top: max(env(safe-area-inset-top), 1rem);
   padding-bottom: max(env(safe-area-inset-bottom), 1rem);
 }
+/* Un único control de voz, con espacio reservado para no tapar acciones. */
+.safe-area { padding-bottom: calc(180px + env(safe-area-inset-bottom)); }
+.voice-host { display: contents; }
+.voice-dock { position: fixed; z-index: 100; bottom: calc(20px + env(safe-area-inset-bottom)); right: max(20px, calc((100vw - 650px) / 2)); width: min(440px, calc(100vw - 40px)); pointer-events: none; }
+.voice-dock-row { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
+.voice-orb { pointer-events: auto; width: 124px; height: 124px; flex-shrink: 0; display: grid; place-items: center; border: 4px solid #52616b; border-radius: 50%; background: #e8edf0; color: #14233b; box-shadow: 0 5px 0 #14233b22, 0 8px 24px #14233b22; cursor: pointer; }
+.voice-orb svg { width: 54px; height: 54px; }
+.voice-orb:active { transform: translateY(2px); }
+.voice-orb:disabled { cursor: default; }
+.voice-state { position: relative; background: #fffdf7; border: 2px solid #5b6b82; padding: 8px 14px; border-radius: 4px; font-size: 16px; color: #14233b; }
+.voice-feedback { position: relative; pointer-events: auto; max-height: 140px; overflow: auto; background: #fffdf7; border: 2px solid #5b6b82; border-radius: 8px; padding: 14px 18px; margin: 0 12px 12px auto; font-size: 19px; box-shadow: 0 4px 16px #14233b15; }
+.voice-feedback::after { content: ""; position: absolute; right: 24px; bottom: -11px; width: 18px; height: 18px; background: #fffdf7; border-right: 2px solid #5b6b82; border-bottom: 2px solid #5b6b82; transform: rotate(45deg); }
+.voice-state::after { content: ""; position: absolute; right: -9px; bottom: -7px; width: 12px; height: 12px; background: #fffdf7; border-right: 2px solid #5b6b82; border-bottom: 2px solid #5b6b82; transform: rotate(45deg); }
+.voice-dock[data-state=listening] .voice-orb { background: #a9e5c2; border-color: #176643; box-shadow: 0 0 0 8px #bfe5d366, 0 5px 0 #17664344; }
+.voice-dock[data-state=working] .voice-orb { background: #ffe39a; border-color: #85600f; }
+.voice-dock[data-state=error] .voice-orb { background: #ffdfd3; border-color: #9b492d; }
+.voice-dock[data-state=unavailable] .voice-orb { background: #e8edf0; color: #52616b; }
+.eyebrow { font-size: 15px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; color: #4a665c; }
+.voice-example { font-size: 22px; line-height: 1.5; padding-left: 18px; border-left: 4px solid #83b89d; }
+.phrase-input { display: flex; flex-direction: column; gap: 8px; }
+.phrase-input textarea { width: 100%; background: transparent; border-bottom: 2px solid #5b6b82; padding: 12px 0; resize: vertical; font-size: 19px; }
+.text-action { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; text-align: left; text-decoration: underline; text-underline-offset: 5px; font-size: 18px; cursor: pointer; }
+.text-action:disabled { opacity: .5; }
+.reminder-note { background: #fffdf5; padding: 28px 24px; border-top: 5px solid #83b89d; border-bottom: 1px solid #cfcab9; }
+.reminder-note h2 { font-size: 30px; font-weight: 700; margin-bottom: 12px; line-height: 1.25; }
+.reminder-note p:not(.eyebrow) { font-size: 20px; margin-top: 8px; }
+.clarification, .confirmation-note { background: #fff1ca; border-left: 4px solid #936b1b; padding: 16px; }
+.manual-settings { border-top: 1px solid #a8b7b0; padding-top: 16px; font-size: 18px; }
+.manual-settings summary { min-height: 48px; cursor: pointer; }
+.manual-settings select { min-height: 54px; border: 2px solid #5b6b82; background: white; padding: 10px; border-radius: 8px; }
+.learning-room, .lesson-room { display: flex; flex-direction: column; gap: 28px; }
+.learning-heading { padding-top: 16px; }
+.learning-heading h1 { font-family: Georgia, serif; font-size: clamp(42px, 9vw, 60px); line-height: 1.05; letter-spacing: -.035em; color: #213f36; }
+.learning-heading h1 em { font-weight: normal; }
+.learning-heading > p:last-child { margin-top: 20px; font-size: 20px; }
+.activity-shelf { list-style: none; border-top: 2px solid #294b3e; }
+.activity-entry { padding: 26px 0; border-bottom: 1px solid #9dac9f; }
+.activity-open { display: flex; gap: 16px; align-items: flex-start; width: 100%; text-align: left; cursor: pointer; padding: 8px 0; }
+.activity-number { font-family: Georgia, serif; font-size: 38px; color: #587267; line-height: 1; }
+.activity-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 10px; }
+.activity-topic { font-size: 16px; display: flex; gap: 8px; align-items: center; }
+.activity-topic svg { width: 22px; flex-shrink: 0; }
+.activity-copy strong { font-family: Georgia, serif; font-size: 29px; line-height: 1.15; font-weight: normal; color: #213f36; }
+.activity-progress { font-size: 17px; }
+.suggested-note { display: block; font-style: italic; color: #456452; }
+.activity-arrow { width: 24px; margin-top: 6px; flex-shrink: 0; }
+.activity-phrase { margin: 12px 0 0 58px; font-size: 17px; color: #425c50; }
+.learning-footnote { display: flex; gap: 10px; font-size: 17px; color: #425c50; }
+.learning-footnote svg { flex-shrink: 0; }
+.lesson-topic { font-size: 18px; color: #425c50; }
+.lesson-page { background: #fffdf5; border-left: 5px solid #83b89d; border-bottom: 1px solid #d2cbbb; padding: 26px; }
+.lesson-position { display: flex; justify-content: space-between; gap: 12px; font-size: 16px; color: #526857; margin-bottom: 38px; }
+.lesson-page h1 { font-family: Georgia, serif; font-size: clamp(36px, 8vw, 48px); line-height: 1.1; color: #213f36; margin-bottom: 26px; }
+.lesson-instruction { font-size: 25px; line-height: 1.6; }
+.lesson-markers { display: flex; gap: 8px; margin: 34px 0 20px; }
+.lesson-markers span { height: 5px; flex: 1; background: #dfdfd1; }
+.lesson-markers .reached { background: #467d60; }
+.lesson-repeat { color: #2f5c46; }
+.lesson-navigation { display: flex; gap: 12px; justify-content: space-between; border-bottom: 1px solid #b5c0b8; padding-bottom: 18px; }
+.lesson-navigation button { min-height: 56px; display: flex; align-items: center; gap: 8px; font-size: 19px; cursor: pointer; }
+.lesson-navigation button:last-child { font-weight: 700; }
+.lesson-navigation button:disabled { opacity: .4; cursor: default; }
+.lesson-navigation svg { width: 22px; flex-shrink: 0; }
+.lesson-pause { font-size: 18px; color: #425c50; }
+@media (max-width: 380px) { .lesson-page { padding: 20px; } .activity-number { font-size: 30px; } .activity-copy strong { font-size: 26px; } .lesson-navigation button { font-size: 16px; } }
+@media (max-width: 480px) { .voice-orb { width: 112px; height: 112px; } .voice-orb svg { width: 48px; height: 48px; } .voice-dock { right: 14px; width: calc(100vw - 28px); } }
+
+.voice-has-feedback .safe-area { padding-bottom: calc(320px + env(safe-area-inset-bottom)); }

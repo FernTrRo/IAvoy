@@ -5,7 +5,8 @@ import { SpeakButton } from "@/components/speak-button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatTime } from "@/lib/format"
 import { VoiceCommand } from "@/components/voice-command"
-import { durationMinutes, normalize } from "@/lib/reminders"
+import { isIntent } from "@/lib/commands"
+import { durationMinutes } from "@/lib/reminders"
 import { speak, stopSpeaking } from "@/lib/voice"
 import type { Reminder } from "@/data/demo"
 
@@ -59,17 +60,17 @@ export function ReminderAlert({ reminder, onDone, onLater, onDismiss }: Props) {
         </DialogHeader>
         <DialogFooter>
           {audioError && <p role="alert">No se pudo reproducir la voz. Revisa el volumen y toca Escuchar otra vez.</p>}
-          <VoiceCommand onListening={active => { listening.current = active }} hint="Di listo, más tarde, posponer cinco minutos o silenciar." onCommand={text => {
+          <VoiceCommand priority={100} onListening={active => { listening.current = active }} hint="Di listo, más tarde, posponer cinco minutos o silenciar." onCommand={text => {
             if (!reminder) return
-            const command = normalize(text)
-            if (["listo", "ya lo hice", "termine"].includes(command)) onDone(reminder.id)
-            else if (command === "mas tarde") onLater(reminder.id)
-            else if (command.startsWith("posponer")) {
+            const command = text
+            if (isIntent(command, "done")) onDone(reminder.id)
+            else if (isIntent(command, "later")) {
               const minutes = durationMinutes(command)
-              if (!minutes) throw new Error("Di: posponer cinco minutos.")
-              onLater(reminder.id, minutes)
-            } else if (command === "silenciar") onDismiss(reminder.id)
-            else throw new Error("Di listo, más tarde o silenciar.")
+              if (minutes === null && /(?:minuto|hora|\d)/i.test(command)) throw new Error("Indica un tiempo entre un minuto y siete días.")
+              onLater(reminder.id, minutes ?? undefined)
+            } else if (isIntent(command, "silence")) onDismiss(reminder.id)
+            else if (isIntent(command, "repeat")) void speak(phrase).catch(() => {})
+            else throw new Error("Puedes decir ya lo hice, después, posponer cinco minutos o silencio.")
           }} />
           <Button size="xl" className="justify-center" onClick={() => reminder && onDone(reminder.id)}>
             <Check /> Listo

@@ -7,7 +7,7 @@ import { ScreenHeader } from "@/components/screen-header"
 import { SpeakButton } from "@/components/speak-button"
 import { formatToday, formatWhen } from "@/lib/format"
 import { VoiceCommand } from "@/components/voice-command"
-import { normalize } from "@/lib/reminders"
+import { isIntent } from "@/lib/commands"
 import { type Reminder } from "@/data/demo"
 
 type Props = {
@@ -17,7 +17,7 @@ type Props = {
   pendingCount: number
   dailyQuestion: boolean
   onDailyQuestion: (v: boolean) => void
-  onNewReminder: () => void
+  onNewReminder: (phrase?: string) => void
   onGuide: () => void
   onList: () => void
 }
@@ -25,7 +25,7 @@ type Props = {
 export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQuestion, onDailyQuestion, onNewReminder, onGuide, onList }: Props) {
   return (
     <div className="flex flex-col gap-7">
-      <ScreenHeader helpText="Toca el botón verde de arriba para decir un aviso con tu voz. Toca el de abajo para seguir aprendiendo donde te quedaste." />
+      <ScreenHeader helpText="Toca el micrófono circular y dime qué necesitas. Puedes pedir un aviso o abrir tus actividades." />
 
       <section>
         <p className="mb-2 text-xl font-semibold">IA-Recuerdo</p>
@@ -44,7 +44,7 @@ export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQues
 
       <section className="flex flex-col gap-4" aria-labelledby="que-hacer">
         <h2 id="que-hacer" className="text-3xl font-bold">¿Qué quieres hacer?</h2>
-        <Button size="xl" onClick={onNewReminder}>
+        <Button size="xl" onClick={() => onNewReminder()}>
           <span className="grid size-13 shrink-0 place-items-center rounded-full border-2 border-accion-borde bg-card">
             <Mic />
           </span>
@@ -62,12 +62,11 @@ export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQues
       </section>
 
       <VoiceCommand hint="Di crear aviso, mis avisos, mis guías o mi perfil." onCommand={text => {
-        const command = normalize(text)
-        if (["crear aviso", "nuevo aviso", "decir un aviso"].includes(command)) onNewReminder()
-        else if (command === "mis avisos") onList()
-        else if (command === "mis guias") onGuide()
-        else if (command === "mi perfil") onSettings()
-        else throw new Error("Di crear aviso, mis avisos, mis guías o mi perfil.")
+        if (isIntent(text, "new")) onNewReminder(text)
+        else if (isIntent(text, "reminders")) onList()
+        else if (isIntent(text, "guides")) onGuide()
+        else if (isIntent(text, "profile")) onSettings()
+        else throw new Error("Puedes decir: hacer un aviso, ver pendientes, aprender o mi perfil.")
       }} />
       <Button variant="outline" onClick={onSettings}>Mi perfil y tutor</Button>
       <Card className="flex-row items-center justify-between gap-4">

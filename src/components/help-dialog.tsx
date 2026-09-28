@@ -1,3 +1,7 @@
+import { useState } from "react"
+import { VoiceCommand } from "@/components/voice-command"
+import { isIntent, speechText } from "@/lib/commands"
+import { speak } from "@/lib/voice"
 import { CircleHelp, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SpeakButton } from "@/components/speak-button"
@@ -8,15 +12,24 @@ import {
 } from "@/components/ui/dialog"
 
 export function HelpDialog({ helpText }: { helpText: string }) {
+  const [open, setOpen] = useState(false)
   const profile = load("profile", defaultProfile)
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="ayuda">
           <CircleHelp /> Ayuda
         </Button>
       </DialogTrigger>
       <DialogContent>
+        <VoiceCommand priority={50} hint="Di: escuchar ayuda, llamar a mi tutor o cerrar." onCommand={text => {
+          if (isIntent(text, "close") || isIntent(text, "back")) setOpen(false)
+          else if (isIntent(text, "repeat") || isIntent(text, "help") || speechText(text) === "escuchar ayuda") void speak(helpText).catch(() => {})
+          else if (/^(?:llamar|llama) (?:a )?(?:mi |el )?(?:tutor|familiar)$/.test(speechText(text))) {
+            if (!profile.tutorPhone) throw new Error("Primero agrega el teléfono del tutor en tu perfil.")
+            window.location.href = `tel:${profile.tutorPhone}`
+          } else throw new Error("Di escuchar ayuda, llamar a mi tutor o cerrar.")
+        }} />
         <DialogHeader>
           <DialogTitle>¿Cómo te ayudo?</DialogTitle>
           <DialogDescription>{helpText}</DialogDescription>
