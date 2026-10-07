@@ -1,82 +1,74 @@
 import { useEffect } from "react"
-import { ArrowLeft, ArrowRight, Check, RotateCcw } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
+import { ArrowLeft, ArrowRight, MessageCircle, Video, Play, RotateCcw, Bookmark } from "lucide-react"
 import { ScreenHeader } from "@/components/screen-header"
 import { speak, stopSpeaking } from "@/lib/voice"
 import { guides } from "@/data/demo"
+import { VoiceCommand } from "@/components/voice-command"
+import { guideTopic, isIntent, speechText } from "@/lib/commands"
+import { load } from "@/lib/storage"
+import { defaultProfile } from "@/lib/profile"
+
+const guideLabels: Record<string, { title: string; subtitle: string; say: string; icon: typeof MessageCircle }> = {
+  "whatsapp-nota": { title: "Envía un audio", subtitle: "WhatsApp", say: "Enséñame a mandar un audio por wasa", icon: MessageCircle },
+  videollamada: { title: "Contesta una videollamada", subtitle: "Videollamadas", say: "Quiero aprender videollamadas", icon: Video },
+}
 
 type GuideListProps = { progress: Record<string, number>; onBack: () => void; onOpen: (id: string) => void }
-
 export function GuideListScreen({ progress, onBack, onOpen }: GuideListProps) {
-  return (
-    <div className="flex flex-col gap-6">
-      <ScreenHeader onBack={onBack} helpText="Elige lo que quieres aprender. Te explico un paso a la vez." />
-      <h1 className="text-4xl font-bold">Aprender paso a paso</h1>
-      <ul className="flex flex-col gap-4">
-        {guides.map((g) => {
-          const step = progress[g.id] ?? 0
-          return (
-            <li key={g.id}>
-              <Card className="gap-3">
-                <p className="text-2xl font-bold leading-snug">{g.title}</p>
-                <p className="text-lg">{step > 0 ? `Vas en el paso ${step + 1} de ${g.steps.length}` : `${g.steps.length} pasos`}</p>
-                <Button onClick={() => onOpen(g.id)} className="self-start">
-                  {step > 0 ? "Continuar" : "Empezar"} <ArrowRight />
-                </Button>
-              </Card>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
+  const profile = load("profile", defaultProfile)
+  return <div className="learning-room">
+    <ScreenHeader onBack={onBack} helpText="Elige una actividad o pídela al micrófono con tus palabras. Cada actividad conserva su avance." />
+    <header className="learning-heading"><h1>Hoy aprendo<br /><em>a mi ritmo.</em></h1></header>
+    <VoiceCommand hint="Di: enséñame a mandar un audio por wasa, o quiero aprender videollamadas." onCommand={text => {
+      if (isIntent(text, "back")) { onBack(); return }
+      const topic = guideTopic(text)
+      const guide = guides.find(g => g.id === topic || speechText(g.title) === speechText(text))
+      if (!guide) throw new Error(topic === "youtube" ? "Entendí YouTube. Esa actividad todavía no está disponible. Puedes elegir audios de WhatsApp o videollamadas." : "Puedes pedirme audios de WhatsApp o videollamadas.")
+      onOpen(guide.id)
+    }} />
+    <ol className="activity-shelf">
+      {guides.map((g, index) => {
+        const step = Math.max(0, Math.min(progress[g.id] ?? 0, g.steps.length - 1))
+        const label = guideLabels[g.id]; const Icon = label?.icon ?? Play
+        return <li key={g.id} className={`activity-entry activity-${index}`}>
+          <button className="activity-open" onClick={() => onOpen(g.id)} aria-label={`${step ? "Continuar" : "Empezar"}: ${g.title}`}>
+            <span className="activity-number" aria-hidden="true">0{index + 1}</span>
+            <span className="activity-copy"><span className="activity-topic"><Icon aria-hidden="true" />{label?.subtitle ?? g.title}</span><strong>{label?.title ?? g.title}</strong><span className="activity-progress">{step ? `Retomar en el paso ${step + 1} de ${g.steps.length}` : `${g.steps.length} pasos, sin prisa`}{profile.interests.includes(g.id) && <span className="suggested-note">Elegida para ti</span>}</span></span>
+            <ArrowRight aria-hidden="true" className="activity-arrow" />
+          </button>
+        </li>
+      })}
+    </ol>
+    <p className="learning-footnote"><Bookmark aria-hidden="true" /> Tu avance se guarda.</p>
+  </div>
 }
 
 type GuideProps = { guideId: string; step: number; onStep: (n: number) => void; onBack: () => void; onFinish: () => void }
-
 export function GuideScreen({ guideId, step, onStep, onBack, onFinish }: GuideProps) {
-  const guide = guides.find((g) => g.id === guideId)!
-  const current = guide.steps[step]
-  const total = guide.steps.length
-  const isLast = step === total - 1
+  const guide = guides.find(g => g.id === guideId)!
+  step = Math.max(0, Math.min(step, guide.steps.length - 1))
+  const current = guide.steps[step]; const isLast = step === guide.steps.length - 1
   const spoken = `Paso ${step + 1}. ${current.title}. ${current.body}`
-
-  // Cada vez que cambia el paso (por un toque de la persona), se lee en voz alta.
-  useEffect(() => {
-    speak(spoken).catch(() => {})
-    return () => void stopSpeaking()
-  }, [spoken])
-
-  return (
-    <div className="flex flex-col gap-6">
-      <ScreenHeader onBack={onBack} helpText="Escucha el paso y hazlo en tu teléfono. Si no quedó claro, toca Repetir. Tu avance se guarda solo." />
-      <section className="flex flex-col gap-3">
-        <p className="text-lg">{guide.title}</p>
-        <Progress value={((step + 1) / total) * 100} aria-label={`Paso ${step + 1} de ${total}`} />
-        <p className="text-xl font-semibold">Paso {step + 1} de {total}</p>
-      </section>
-
-      <Card className="min-h-64 justify-center gap-4 p-7">
-        <h1 className="text-4xl font-bold leading-tight">{current.title}</h1>
-        <p className="text-2xl leading-relaxed">{current.body}</p>
-      </Card>
-
-      <Button variant="outline" size="xl" className="justify-center" onClick={() => speak(spoken, { rate: 0.75 }).catch(() => {})}>
-        <RotateCcw /> Repetir despacio
-      </Button>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Button variant="outline" className="min-h-20 text-xl" disabled={step === 0} onClick={() => onStep(step - 1)}>
-          <ArrowLeft /> Atrás
-        </Button>
-        {isLast ? (
-          <Button className="min-h-20 text-xl" onClick={onFinish}><Check /> Terminé</Button>
-        ) : (
-          <Button className="min-h-20 text-xl" onClick={() => onStep(step + 1)}>Siguiente <ArrowRight /></Button>
-        )}
-      </div>
-    </div>
-  )
+  useEffect(() => { void speak(spoken).catch(() => {}); return () => void stopSpeaking() }, [spoken])
+  const next = () => { if (isLast) onFinish(); else onStep(step + 1) }
+  return <div className="lesson-room">
+    <ScreenHeader onBack={onBack} helpText="Toca el micrófono para decir sigue, vuelve al paso anterior, otra vez o luego sigo. Tu avance se guarda al cambiar de paso." />
+    <VoiceCommand hint="Di: sigue, atrás, otra vez, más lento o luego sigo." onCommand={text => {
+      if (isIntent(text, "next") || isIntent(text, "done")) next()
+      else if (isIntent(text, "back")) onStep(Math.max(0, step - 1))
+      else if (isIntent(text, "repeat") || isIntent(text, "slow")) void speak(spoken, { rate: isIntent(text, "slow") ? 0.75 : 0.9 }).catch(() => {})
+      else if (isIntent(text, "pause") || isIntent(text, "close") || isIntent(text, "guides")) onBack()
+      else throw new Error("Puedes decir sigue, atrás, otra vez, más lento o luego sigo.")
+    }} />
+    <p className="lesson-topic">{guide.title}</p>
+    <section className="lesson-page" aria-label={`Paso ${step + 1} de ${guide.steps.length}`}>
+      <div className="lesson-position"><span>Ahora, solo esto</span><span>{String(step + 1).padStart(2, "0")} / {String(guide.steps.length).padStart(2, "0")}</span></div>
+      <h1>{current.title}</h1><p className="lesson-instruction">{current.body}</p>
+      <div className="lesson-markers" aria-hidden="true">{guide.steps.map((_, i) => <span key={i} className={i <= step ? "reached" : ""} />)}</div>
+      <button className="text-action lesson-repeat" onClick={() => void speak(spoken, { rate: 0.75 }).catch(() => {})}><RotateCcw aria-hidden="true" /> Escucharlo otra vez</button>
+    </section>
+    <nav className="lesson-navigation" aria-label="Pasos de la actividad"><button disabled={step === 0} onClick={() => onStep(step - 1)}><ArrowLeft aria-hidden="true" /> Anterior</button><button onClick={next}>{isLast ? "Terminé" : "Ya está, seguimos"}<ArrowRight aria-hidden="true" /></button></nav>
+    <p className="lesson-pause">Si necesitas descansar, di “luego sigo”.</p>
+    <details className="manual-settings"><summary>¿Cómo uso otra aplicación?</summary><p>Usa Inicio o el gesto de inicio de tu teléfono. No cierres IA-Recuerdo. Vuelve aquí para seguir con el siguiente paso; el micrófono aún no escucha desde otras aplicaciones.</p></details>
+  </div>
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
+import { VoiceProvider } from "@/components/voice-command"
 import { Toaster } from "@/components/ui/sonner"
 import { ReminderAlert } from "@/components/reminder-alert"
 import { HomeScreen } from "@/screens/home"
@@ -8,86 +9,128 @@ import { RemindersScreen } from "@/screens/reminders"
 import { GuideListScreen, GuideScreen } from "@/screens/guide"
 import { demoReminders, guides, type Reminder } from "@/data/demo"
 import { load, save } from "@/lib/storage"
+import { SettingsScreen } from "@/screens/settings"
+import { defaultProfile, type Profile } from "@/lib/profile"
+import { acknowledge, completeReminder, dueAt } from "@/lib/reminders"
+import { speak } from "@/lib/voice"
 import { formatWhen } from "@/lib/format"
 
 type Screen =
   | { name: "home" }
-  | { name: "new" }
+  | { name: "new"; id?: string; phrase?: string }
+  | { name: "settings" }
   | { name: "list" }
   | { name: "guides" }
   | { name: "guide"; id: string }
 
 export default function App() {
+  const [profile, setProfile] = useState(() => load("profile", defaultProfile))
+  const [dailyShown, setDailyShown] = useState(() => load("dailyShown", ""))
   const [screen, setScreen] = useState<Screen>({ name: "home" })
   const [reminders, setReminders] = useState<Reminder[]>(() => load("reminders", demoReminders))
   const [progress, setProgress] = useState<Record<string, number>>(() => load("progress", {}))
-  const [lastGuide, setLastGuide] = useState<string>(() => load("lastGuide", guides[0].id))
+  const [, setLastGuide] = useState<string>(() => load("lastGuide", guides[0].id))
   const [dailyQuestion, setDailyQuestion] = useState(() => load("dailyQuestion", false))
   const [alerting, setAlerting] = useState<Reminder | null>(null)
 
   useEffect(() => { save("reminders", reminders) }, [reminders])
   useEffect(() => { save("progress", progress) }, [progress])
-  useEffect(() => { save("lastGuide", lastGuide) }, [lastGuide])
+
   useEffect(() => { save("dailyQuestion", dailyQuestion) }, [dailyQuestion])
   useEffect(() => { window.scrollTo(0, 0) }, [screen])
+
+  useEffect(() => {
+    const goHome = () => {
+      setAlerting(null)
+      setScreen({ name: "home" })
+    }
+    window.addEventListener("iarecuerdo:home-confirmed", goHome)
+    return () => window.removeEventListener("iarecuerdo:home-confirmed", goHome)
+  }, [])
 
 
   useEffect(() => {
     const check = () => {
       if (alerting) return
-      const due = reminders.find((r) => !r.done && new Date(r.when).getTime() <= Date.now())
+      const due = [...reminders].sort((a, b) => dueAt(a) - dueAt(b)).find(r => dueAt(r) <= Date.now())
       if (due) setAlerting(due)
     }
     const first = setTimeout(check, 1500)
-    const id = setInterval(check, 15_000)
+    const id = setInterval(check, 1000)
     return () => { clearTimeout(first); clearInterval(id) }
   }, [reminders, alerting])
 
   const pending = useMemo(
-    () => reminders.filter((r) => !r.done).sort((a, b) => a.when.localeCompare(b.when)),
+    () => reminders.filter((r) => !r.done && !r.cancelled).sort((a, b) => a.when.localeCompare(b.when)),
     [reminders]
   )
   const next = pending.find((r) => new Date(r.when).getTime() > Date.now()) ?? pending[0]
 
+  function updateReminders(next: Reminder[]) {
+    if (!save("reminders", next)) { toast.error("No se pudo guardar. Revisa el almacenamiento antes de continuar."); return false }
+    setReminders(next)
+    return true
+  }
   const markDone = (id: string) => {
-    setReminders((rs) => rs.map((r) => (r.id === id ? { ...r, done: true } : r)))
-    setAlerting(null)
-    toast.success("Aviso terminado")
+    if (updateReminders(reminders.map(r => r.id === id ? completeReminder(r) : r))) {
+      setAlerting(null); toast.success("Actividad realizada")
+    }
   }
-  const snooze = (id: string) => {
-    const when = new Date(Date.now() + 10 * 60_000).toISOString()
-    setReminders((rs) => rs.map((r) => (r.id === id ? { ...r, when } : r)))
-    setAlerting(null)
-    toast("Te aviso otra vez en 10 minutos")
+  const snooze = (id: string, minutes?: number) => {
+    const r = reminders.find(r => r.id === id)
+    const delay = minutes ?? r?.snoozeMinutes ?? 10
+    if (updateReminders(reminders.map(r => r.id === id ? { ...r, notified: false, nextAlertAt: new Date(Date.now() + delay * 60000).toISOString() } : r))) {
+      setAlerting(null); toast(`Te aviso otra vez en ${delay} minutos`)
+    }
   }
-  const addReminder = (text: string, when: string) => {
-    setReminders((rs) => [...rs, { id: crypto.randomUUID(), text, when, done: false }])
-    toast.success(`Aviso guardado para ${formatWhen(when).toLowerCase()}`)
+  const dismiss = (id: string) => {
+    if (updateReminders(reminders.map(r => r.id === id ? acknowledge(r) : r))) setAlerting(null)
+  }
+  const addReminder = (r: Reminder) => {
+    const next = reminders.some(item => item.id === r.id) ? reminders.map(item => item.id === r.id ? r : item) : [...reminders, r]
+    if (!updateReminders(next)) return
+    toast.success(`Aviso guardado para ${formatWhen(r.when).toLowerCase()}`)
     setScreen({ name: "home" })
   }
-  const openGuide = (id: string) => { setLastGuide(id); setScreen({ name: "guide", id }) }
+  const openGuide = (id: string) => { setLastGuide(id); save("lastGuide", id); setScreen({ name: "guide", id }) }
+  const saveProfile = (p: Profile) => {
+    if (!save("profile", p)) { toast.error("No se pudo guardar el perfil."); return }
+    setProfile(p); toast.success("Perfil guardado"); setScreen({ name: "home" })
+  }
+  useEffect(() => {
+    const today = new Date().toDateString()
+    if (dailyQuestion && dailyShown !== today && screen.name === "home" && !alerting) {
+      setDailyShown(today); save("dailyShown", today)
+      toast("¿Algo que recordar hoy?", { duration: 10000, action: { label: "Añadir", onClick: () => setScreen({ name: "new" }) } })
+      void speak("¿Quieres agregar algo para recordar hoy?").catch(() => {})
+    }
+  }, [dailyQuestion, dailyShown, screen.name, alerting])
 
   return (
-    <div className="safe-area mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5">
+    <VoiceProvider><div className="safe-area mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5">
       {screen.name === "home" && (
         <HomeScreen
+          userName={profile.name}
+          onSettings={() => setScreen({ name: "settings" })}
           next={next}
           pendingCount={pending.length}
           dailyQuestion={dailyQuestion}
           onDailyQuestion={setDailyQuestion}
-          onNewReminder={() => setScreen({ name: "new" })}
-          onGuide={() => ((progress[lastGuide] ?? 0) > 0 ? openGuide(lastGuide) : setScreen({ name: "guides" }))}
+          onNewReminder={phrase => setScreen({ name: "new", phrase })}
+          onGuide={() => setScreen({ name: "guides" })}
           onList={() => setScreen({ name: "list" })}
         />
       )}
-      {screen.name === "new" && <NewReminderScreen onCancel={() => setScreen({ name: "home" })} onSave={addReminder} />}
+      {screen.name === "new" && <NewReminderScreen key={screen.id ?? "new"} initialPhrase={screen.phrase} initial={reminders.find(r => r.id === screen.id)} onCancel={() => setScreen({ name: "home" })} onSave={addReminder} />}
       {screen.name === "list" && (
         <RemindersScreen
+          onEdit={id => setScreen({ name: "new", id })}
+          onCancel={id => { updateReminders(reminders.map(r => r.id === id ? { ...r, cancelled: true } : r)) }}
           reminders={reminders}
           onBack={() => setScreen({ name: "home" })}
           onDone={markDone}
           onNew={() => setScreen({ name: "new" })}
-          onResetDemo={() => { setReminders(demoReminders); setProgress({}); toast("Datos de demostración restablecidos") }}
+          onResetDemo={() => { updateReminders(demoReminders); toast("Avisos de demostración restablecidos") }}
         />
       )}
       {screen.name === "guides" && (
@@ -107,8 +150,9 @@ export default function App() {
         />
       )}
 
-      <ReminderAlert reminder={alerting} onDone={markDone} onLater={snooze} />
+      {screen.name === "settings" && <SettingsScreen profile={profile} onSave={saveProfile} onBack={() => setScreen({ name: "home" })} />}
+      <ReminderAlert reminder={alerting} onDone={markDone} onLater={snooze} onDismiss={dismiss} />
       <Toaster />
-    </div>
+    </div></VoiceProvider>
   )
 }

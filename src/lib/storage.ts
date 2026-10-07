@@ -10,7 +10,8 @@ export function load<T>(key: string, fallback: T): T {
 export function save<T>(key: string, value: T) {
   try {
     localStorage.setItem(`iarecuerdo:${key}`, JSON.stringify(value))
+    return true
   } catch {
-    /* sin almacenamiento: la demo sigue funcionando en memoria */
+    return false
   }
 }

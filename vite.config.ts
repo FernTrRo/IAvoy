@@ -5,10 +5,12 @@ import tailwindcss from "@tailwindcss/vite"
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
   optimizeDeps: { entries: ["index.html"] },
   server: {
-    host: true,
+    host: "127.0.0.1",
+    port: 5173,
+    strictPort: true,
     watch: { ignored: ["**/android/**"] },
   },
 })

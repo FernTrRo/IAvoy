@@ -4,6 +4,14 @@ export type Reminder = {
   /** fecha y hora en ISO */
   when: string
   done: boolean
+  advanceMinutes?: number
+  recurrence?: "once" | "daily" | "weekly"
+  repeats?: number
+  repeatSeconds?: number
+  snoozeMinutes?: number
+  nextAlertAt?: string
+  notified?: boolean
+  cancelled?: boolean
 }
 
 export type GuideStep = { title: string; body: string }
@@ -16,7 +24,7 @@ const at = (hoursFromNow: number, minutes = 0) => {
 }
 
 export const demoReminders: Reminder[] = [
-  { id: "r1", text: "Llamar al médico", when: at(0), done: false },
+  { id: "r1", text: "Llamar al médico", when: at(1), done: false },
   { id: "r2", text: "Tomar la pastilla de la tarde", when: at(3), done: false },
   { id: "r3", text: "Llamar a mi hija", when: at(24, 0), done: false },
 ]

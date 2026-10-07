@@ -1,4 +1,7 @@
-import { Check, Plus } from "lucide-react"
+import { useState } from "react"
+import { VoiceCommand } from "@/components/voice-command"
+import { isIntent, reminderTarget, speechText } from "@/lib/commands"
+import { Check, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ScreenHeader } from "@/components/screen-header"
@@ -7,6 +10,8 @@ import { formatWhen, reminderPhrase } from "@/lib/format"
 import type { Reminder } from "@/data/demo"
 
 type Props = {
+  onEdit: (id: string) => void
+  onCancel: (id: string) => void
   reminders: Reminder[]
   onBack: () => void
   onDone: (id: string) => void
@@ -14,15 +19,34 @@ type Props = {
   onResetDemo: () => void
 }
 
-export function RemindersScreen({ reminders, onBack, onDone, onNew, onResetDemo }: Props) {
-  const pending = reminders.filter((r) => !r.done).sort((a, b) => a.when.localeCompare(b.when))
-  const done = reminders.filter((r) => r.done)
+export function RemindersScreen({ onEdit, onCancel, reminders, onBack, onDone, onNew, onResetDemo }: Props) {
+  const [cancelId, setCancelId] = useState<string | null>(null)
+  const pending = reminders.filter((r) => !r.done && !r.cancelled).sort((a, b) => a.when.localeCompare(b.when))
+  const done = reminders.filter((r) => r.done && !r.cancelled)
 
   return (
     <div className="flex flex-col gap-6">
       <ScreenHeader onBack={onBack} helpText="Aquí están tus avisos. Toca Escuchar para oír uno, o Listo cuando ya lo hiciste." />
-      <h1 className="text-4xl font-bold">Mis avisos</h1>
+      <h1 className="home-greeting">Mis avisos</h1>
 
+      <Button onClick={onNew}><Plus /> Crear aviso</Button>
+      <VoiceCommand hint="Di modificar seguido del nombre del aviso, o cancelar seguido de su nombre." onCommand={text => {
+        const command = text
+        if (cancelId) {
+          if (isIntent(command, "yes")) { onCancel(cancelId); setCancelId(null) }
+          else if (isIntent(command, "no")) setCancelId(null)
+          else throw new Error("Di sí para cancelar el aviso o no para conservarlo.")
+          return
+        }
+        if (isIntent(command, "new")) { onNew(); return }
+        if (isIntent(command, "back")) { onBack(); return }
+        const match = reminderTarget(command)
+        const matches = match ? pending.filter(r => speechText(r.text) === match.name) : []
+        if (!match || matches.length !== 1) throw new Error("Di cambiar o quitar, seguido del nombre del aviso. Si hay nombres iguales, elige su botón.")
+        if (match.action === "cancel") setCancelId(matches[0].id)
+        else onEdit(matches[0].id)
+      }} />
+      {cancelId && <Card role="alert"><p>¿Cancelar el aviso «{reminders.find(r => r.id === cancelId)?.text}»?</p><Button onClick={() => { onCancel(cancelId); setCancelId(null) }}>Sí, cancelar aviso</Button><Button variant="outline" onClick={() => setCancelId(null)}>No, conservar</Button></Card>}
       {pending.length === 0 ? (
         <Card>
           <p className="text-xl">No tienes avisos pendientes.</p>
@@ -32,12 +56,17 @@ export function RemindersScreen({ reminders, onBack, onDone, onNew, onResetDemo 
         <ul className="flex flex-col gap-4">
           {pending.map((r) => (
             <li key={r.id}>
-              <Card className="gap-3">
-                <p className="text-2xl font-bold leading-snug">{r.text}</p>
+              <Card className="reminder-card gap-3">
+                <Button variant="outline" size="icon" className="reminder-trash" aria-label={`Cancelar aviso: ${r.text}`} title="Cancelar aviso" onClick={() => setCancelId(r.id)}><Trash2 aria-hidden="true" /></Button>
+                <div className="reminder-card-heading">
+                  <SpeakButton iconOnly size="icon" text={reminderPhrase(r.text)} label={`Escuchar aviso: ${r.text}`} />
+                  <h2 className="text-2xl font-bold leading-snug">{r.text}</h2>
+                </div>
                 <p className="text-xl">{formatWhen(r.when)}</p>
+                <p>{r.advanceMinutes ? `${r.advanceMinutes} minutos antes y a la hora indicada` : "A la hora indicada"} · {r.recurrence === "daily" ? "Diario" : r.recurrence === "weekly" ? "Semanal" : "Una vez"}</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <SpeakButton text={reminderPhrase(r.text)} />
                   <Button onClick={() => onDone(r.id)}><Check /> Listo</Button>
+                  <Button variant="outline" onClick={() => onEdit(r.id)}>Modificar</Button>
                 </div>
               </Card>
             </li>

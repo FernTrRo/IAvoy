@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli"
 
 const config: CapacitorConfig = {
   appId: "mx.iarecuerdo.app",
-  appName: "IAvoy",
+  appName: "IA-Recuerdo",
   webDir: "dist",
 }
 
