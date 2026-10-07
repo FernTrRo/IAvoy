@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScreenHeader } from "@/components/screen-header"
 import { VoiceCommand } from "@/components/voice-command"
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { localDateInput, numbers, durationMinutes } from "@/lib/reminders"
 import { isIntent, parseReminderRequest, speechText, reminderConfirmation, type ReminderContext } from "@/lib/commands"
 import { speak } from "@/lib/voice"
@@ -96,12 +97,21 @@ export function NewReminderScreen({ initial, initialPhrase, onCancel, onSave }: 
   }
   return <div className="flex flex-col gap-6">
     <ScreenHeader onBack={() => setConfirmCancel(true)} helpText="Toca el micrófono y di qué quieres recordar, cuándo y con qué frecuencia en una sola frase. Revisa el resumen y di guardar. También puedes escribir o ajustar los datos." />
-    <header><p className="eyebrow">Tu memoria, en voz alta</p><h1 className="text-4xl font-bold">{initial ? "Cambiemos tu aviso" : "¿Qué te recuerdo?"}</h1></header>
-    <p className="voice-example">“Recuérdame llamar a mi hija mañana a las diez de la mañana, todos los días”.</p>
+    <header><h1 className="home-greeting">{initial ? "Cambiemos tu aviso" : "¿Qué te recuerdo?"}</h1></header>
     <VoiceCommand onCommand={command} hint="Di la tarea, la fecha, la hora y la frecuencia en una sola frase." />
-    {confirmCancel ? <section className="confirmation-note" role="alert"><p>¿Salir sin guardar? Di sí o no.</p><div className="flex gap-3"><Button onClick={onCancel}>Sí, salir</Button><Button variant="outline" onClick={() => setConfirmCancel(false)}>No, seguir</Button></div></section> : null}
+    <Dialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+      <DialogContent showClose={false} className="exit-confirmation" onPointerDownOutside={event => event.preventDefault()}>
+        <DialogTitle className="text-3xl">¿Salir sin guardar?</DialogTitle>
+        <DialogDescription className="text-2xl">Di sí para salir o no para seguir.</DialogDescription>
+        <VoiceCommand priority={200} onCommand={command} hint="Di sí para salir sin guardar o no para seguir con tu aviso." />
+        <DialogFooter>
+          <Button className="min-h-16 text-2xl" onClick={() => setConfirmCancel(false)}>No, seguir</Button>
+          <Button className="min-h-16 text-2xl" variant="outline" onClick={onCancel}>Sí, salir</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     <form className="phrase-input" onSubmit={e => { e.preventDefault(); command(phrase, true) }}>
-      <Label htmlFor="frase">Tu aviso completo (también puedes editarlo)</Label>
+      <Label htmlFor="frase">Tu aviso · puedes editarlo</Label>
       <textarea id="frase" rows={2} value={phrase} onChange={e => setPhrase(e.target.value)} placeholder="Llamar a mi hija mañana a las diez de la mañana, todos los días" />
       <button type="submit" className="text-action" disabled={!phrase.trim()}>Revisar frase</button>
     </form>

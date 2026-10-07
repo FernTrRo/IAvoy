@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { BellRing, Check, Clock } from "lucide-react"
+import { BellRing, Check, Clock, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SpeakButton } from "@/components/speak-button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -49,14 +49,14 @@ export function ReminderAlert({ reminder, onDone, onLater, onDismiss }: Props) {
 
   return (
     <Dialog open={!!reminder}>
-      <DialogContent showClose={false} onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="reminder-alert" showClose={false} onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader className="pr-0">
           <div className="mb-2 grid size-16 place-items-center rounded-full border-2 border-ayuda-borde bg-ayuda">
             <BellRing className="size-9" />
           </div>
-          <DialogTitle className="text-3xl">{reminder?.text}</DialogTitle>
-          <DialogDescription className="text-xl text-foreground">{phrase}</DialogDescription>
-          {reminder && <p className="text-muted-foreground text-lg">Aviso de las {formatTime(reminder.when)}</p>}
+          <DialogTitle className="reminder-alert-title">{reminder?.text}</DialogTitle>
+          <DialogDescription className="reminder-alert-description text-foreground">¿Ya lo hiciste?</DialogDescription>
+          {reminder && <p className="reminder-alert-time text-muted-foreground">Aviso de las {formatTime(reminder.when)}</p>}
         </DialogHeader>
         <DialogFooter>
           {audioError && <p role="alert">No se pudo reproducir la voz. Revisa el volumen y toca Escuchar otra vez.</p>}
@@ -72,14 +72,16 @@ export function ReminderAlert({ reminder, onDone, onLater, onDismiss }: Props) {
             else if (isIntent(command, "repeat")) void speak(phrase).catch(() => {})
             else throw new Error("Puedes decir ya lo hice, después, posponer cinco minutos o silencio.")
           }} />
-          <Button size="xl" className="justify-center" onClick={() => reminder && onDone(reminder.id)}>
+          <div className="reminder-alert-actions">
+          <Button onClick={() => reminder && onDone(reminder.id)}>
             <Check /> Listo
           </Button>
-          <Button variant="outline" className="min-h-16 w-full text-xl" onClick={() => reminder && onLater(reminder.id)}>
+          <Button variant="outline" onClick={() => reminder && onLater(reminder.id)}>
             <Clock /> Más tarde
           </Button>
-          <Button variant="outline" onClick={() => reminder && onDismiss(reminder.id)}>Silenciar este aviso</Button>
+          <Button variant="outline" onClick={() => reminder && onDismiss(reminder.id)}><VolumeX aria-hidden="true" />Silenciar</Button>
           <SpeakButton text={phrase} label="Escuchar otra vez" className="w-full" />
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

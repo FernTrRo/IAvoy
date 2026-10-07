@@ -18,7 +18,7 @@ export function GuideListScreen({ progress, onBack, onOpen }: GuideListProps) {
   const profile = load("profile", defaultProfile)
   return <div className="learning-room">
     <ScreenHeader onBack={onBack} helpText="Elige una actividad o pídela al micrófono con tus palabras. Cada actividad conserva su avance." />
-    <header className="learning-heading"><p className="eyebrow">Un ratito para ti</p><h1>Hoy aprendo<br /><em>a mi ritmo.</em></h1><p>Puedes parar, volver y preguntar otra vez.</p></header>
+    <header className="learning-heading"><h1>Hoy aprendo<br /><em>a mi ritmo.</em></h1></header>
     <VoiceCommand hint="Di: enséñame a mandar un audio por wasa, o quiero aprender videollamadas." onCommand={text => {
       if (isIntent(text, "back")) { onBack(); return }
       const topic = guideTopic(text)
@@ -36,11 +36,10 @@ export function GuideListScreen({ progress, onBack, onOpen }: GuideListProps) {
             <span className="activity-copy"><span className="activity-topic"><Icon aria-hidden="true" />{label?.subtitle ?? g.title}</span><strong>{label?.title ?? g.title}</strong><span className="activity-progress">{step ? `Retomar en el paso ${step + 1} de ${g.steps.length}` : `${g.steps.length} pasos, sin prisa`}{profile.interests.includes(g.id) && <span className="suggested-note">Elegida para ti</span>}</span></span>
             <ArrowRight aria-hidden="true" className="activity-arrow" />
           </button>
-          <p className="activity-phrase">Di: “{label?.say ?? g.title}”.</p>
         </li>
       })}
     </ol>
-    <p className="learning-footnote"><Bookmark aria-hidden="true" /> Guardamos el lugar de cada actividad para cuando quieras volver.</p>
+    <p className="learning-footnote"><Bookmark aria-hidden="true" /> Tu avance se guarda.</p>
   </div>
 }
 

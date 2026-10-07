@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button"
 import { speak, stopSpeaking } from "@/lib/voice"
 import type { ComponentProps } from "react"
 
-type Props = { text: string; label?: string; slow?: boolean } & Omit<ComponentProps<typeof Button>, "onClick">
+type Props = { text: string; label?: string; slow?: boolean; iconOnly?: boolean } & Omit<ComponentProps<typeof Button>, "onClick">
 
 /** Botón "Escuchar": lee el texto en voz alta. Tocar de nuevo lo detiene. */
-export function SpeakButton({ text, label = "Escuchar", slow, ...props }: Props) {
+export function SpeakButton({ text, label = "Escuchar", slow, iconOnly = false, ...props }: Props) {
   const [speaking, setSpeaking] = useState(false)
   useEffect(() => () => void stopSpeaking(), [])
 
@@ -30,8 +30,8 @@ export function SpeakButton({ text, label = "Escuchar", slow, ...props }: Props)
 
   return (
     <Button variant="outline" onClick={toggle} aria-pressed={speaking} {...props}>
-      {speaking ? <Square /> : <Volume2 />}
-      {speaking ? "Detener" : label}
+      {speaking ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+      <span className={iconOnly ? "sr-only" : undefined}>{speaking ? "Detener" : label}</span>
     </Button>
   )
 }

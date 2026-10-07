@@ -14,6 +14,22 @@ test("horas habladas: tarde, medianoche y minutos", () => {
   assert.equal(localDateInput(parseSpokenDate("mañana a las doce de la madrugada", now)), "2026-09-25T00:00")
   assert.equal(localDateInput(parseSpokenDate("mañana a las 14:45", now)), "2026-09-25T14:45")
 })
+
+test("noche desde las seis y madrugada hasta las seis, con medianoche a las doce", () => {
+  for (const hour of [6, 7, 8, 9, 10, 11]) {
+    const date = parseSpokenDate(`mañana a las ${hour} de la noche`, now)
+    assert.equal(date.getHours(), hour + 12)
+    assert.equal(date.getDate(), 25)
+  }
+  for (const period of ["noche", "madrugada"]) {
+    assert.equal(localDateInput(parseSpokenDate(`mañana a las doce de la ${period}`, now)), "2026-09-25T00:00")
+    assert.equal(localDateInput(parseSpokenDate(`mañana a las doce y media de la ${period}`, now)), "2026-09-25T00:30")
+  }
+  for (const hour of [1, 2, 3, 4, 5, 6]) assert.equal(parseSpokenDate(`mañana a las ${hour} de la madrugada`, now).getHours(), hour)
+  assert.equal(parseSpokenDate("mañana a las doce de la tarde", now).getHours(), 12)
+  assert.throws(() => parseSpokenDate("mañana a las tres de la noche", now), /madrugada/)
+  assert.throws(() => parseSpokenDate("mañana a las nueve de la madrugada", now), /mañana/)
+})
 test("no se adivinan horas ambiguas, pasadas, inválidas ni fechas no soportadas", () => {
   for (const phrase of ["mañana a las diez", "hoy a las diez de la mañana", "mañana a las 25:00", "mañana a las 14:75", "el treinta de febrero", "", "mañana a las diez de la mañana y el viernes"]) assert.throws(() => parseSpokenDate(phrase, now), undefined, phrase)
 })

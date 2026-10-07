@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { VoiceCommand } from "@/components/voice-command"
 import { isIntent, reminderTarget, speechText } from "@/lib/commands"
-import { Check, Plus } from "lucide-react"
+import { Check, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ScreenHeader } from "@/components/screen-header"
@@ -27,7 +27,7 @@ export function RemindersScreen({ onEdit, onCancel, reminders, onBack, onDone, o
   return (
     <div className="flex flex-col gap-6">
       <ScreenHeader onBack={onBack} helpText="Aquí están tus avisos. Toca Escuchar para oír uno, o Listo cuando ya lo hiciste." />
-      <h1 className="text-4xl font-bold">Mis avisos</h1>
+      <h1 className="home-greeting">Mis avisos</h1>
 
       <Button onClick={onNew}><Plus /> Crear aviso</Button>
       <VoiceCommand hint="Di modificar seguido del nombre del aviso, o cancelar seguido de su nombre." onCommand={text => {
@@ -56,15 +56,17 @@ export function RemindersScreen({ onEdit, onCancel, reminders, onBack, onDone, o
         <ul className="flex flex-col gap-4">
           {pending.map((r) => (
             <li key={r.id}>
-              <Card className="gap-3">
-                <p className="text-2xl font-bold leading-snug">{r.text}</p>
+              <Card className="reminder-card gap-3">
+                <Button variant="outline" size="icon" className="reminder-trash" aria-label={`Cancelar aviso: ${r.text}`} title="Cancelar aviso" onClick={() => setCancelId(r.id)}><Trash2 aria-hidden="true" /></Button>
+                <div className="reminder-card-heading">
+                  <SpeakButton iconOnly size="icon" text={reminderPhrase(r.text)} label={`Escuchar aviso: ${r.text}`} />
+                  <h2 className="text-2xl font-bold leading-snug">{r.text}</h2>
+                </div>
                 <p className="text-xl">{formatWhen(r.when)}</p>
                 <p>{r.advanceMinutes ? `${r.advanceMinutes} minutos antes y a la hora indicada` : "A la hora indicada"} · {r.recurrence === "daily" ? "Diario" : r.recurrence === "weekly" ? "Semanal" : "Una vez"}</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <SpeakButton text={reminderPhrase(r.text)} />
                   <Button onClick={() => onDone(r.id)}><Check /> Listo</Button>
                   <Button variant="outline" onClick={() => onEdit(r.id)}>Modificar</Button>
-                  <Button variant="outline" onClick={() => setCancelId(r.id)}>Cancelar aviso</Button>
                 </div>
               </Card>
             </li>

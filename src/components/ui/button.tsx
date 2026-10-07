@@ -8,11 +8,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Acción principal: verde claro, borde oscuro, texto oscuro
-        default: "bg-accion text-foreground border-2 border-accion-borde hover:bg-[#a9dcc4]",
+        // Azul claro con texto oscuro para mantener el contraste.
+        default: "bg-accion text-foreground hover:bg-[#a5ceff]",
         // Ayuda: siempre amarilla
-        ayuda: "bg-ayuda text-foreground border-2 border-ayuda-borde hover:bg-[#ffcc47]",
-        outline: "bg-card text-foreground border-2 border-border hover:bg-muted",
+        ayuda: "bg-ayuda text-foreground hover:bg-[#ffcc47]",
+        outline: "bg-card text-foreground hover:bg-muted",
         ghost: "text-foreground hover:bg-muted",
         link: "text-foreground underline underline-offset-4 decoration-2 hover:decoration-4",
       },

@@ -39,7 +39,9 @@ export function parseSpokenDate(text: string, now = new Date()): Date {
   const period = match[4]
   if (hour >= 1 && hour <= 12 && !period) throw new Error("Indica si es de la mañana, tarde o noche.")
   if (period && (hour < 1 || hour > 12)) throw new Error("Con mañana o tarde, usa una hora entre una y doce.")
-  if (period) hour = hour % 12 + (["tarde", "noche"].includes(period) ? 12 : 0)
+  if (period === "noche" && hour < 6) throw new Error("Para la noche, indica una hora entre seis y doce. ¿Te refieres a la madrugada?")
+  if (period === "madrugada" && hour > 6 && hour !== 12) throw new Error("Para la madrugada, indica las doce o una hora entre una y seis. ¿Te refieres a la mañana?")
+  if (period) hour = hour % 12 + (period === "tarde" || (period === "noche" && hour !== 12) ? 12 : 0)
   const date = new Date(now)
   date.setDate(date.getDate() + (s.startsWith("pasado manana") ? 2 : s.startsWith("manana") ? 1 : 0))
   date.setHours(hour, minute, 0, 0)

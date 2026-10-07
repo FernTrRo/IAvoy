@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { Mic, MicOff, Square, LoaderCircle } from "lucide-react"
+import { Mic, MicOff, Square, LoaderCircle, Volume2 } from "lucide-react"
+import { HoldHelp } from "@/components/hold-help"
 import { isIntent } from "@/lib/commands"
-import { canListen, listenOnce, stopListening, stopSpeaking, speak } from "@/lib/voice"
+import { canListen, listenOnce, finishListening, stopListening, stopSpeaking, speak } from "@/lib/voice"
 
 type Handler = { onCommand: (text: string) => void | Promise<void>; hint: string; onListening?: (active: boolean) => void; priority?: number }
 type Entry = { id: symbol; host: HTMLElement; handler: { current: Handler }; order: number }
@@ -13,6 +14,20 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [phase, setPhase] = useState<"idle" | "listening" | "working" | "error">("idle")
   const [message, setMessage] = useState("")
+  const [speaking, setSpeaking] = useState(false)
+  const [helpMessage, setHelpMessage] = useState("")
+  const closeHelp = useCallback(() => setHelpMessage(""), [])
+  const explain = useCallback((text: string) => {
+    session.current++
+    void stopListening()
+    setPhase("idle")
+    setHelpMessage(text)
+  }, [])
+  useEffect(() => {
+    const update = (event: Event) => setSpeaking((event as CustomEvent<boolean>).detail)
+    window.addEventListener("iarecuerdo:speaking", update)
+    return () => window.removeEventListener("iarecuerdo:speaking", update)
+  }, [])
   const serial = useRef(0)
   const session = useRef(0)
   const busy = useRef(false)
@@ -33,10 +48,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   }, [target?.id])
   async function toggle() {
     if (busy.current) {
-      session.current++
-      await stopListening()
-      target?.handler.current.onListening?.(false)
-      setPhase("idle"); setMessage("Escucha detenida")
+      if (phase === "listening") {
+        setPhase("working")
+        finishListening()
+      }
       return
     }
     if (!target) return
@@ -91,15 +106,16 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const available = canListen()
   const label = !available ? "Micrófono no disponible" : phase === "listening" ? "Detener escucha" : phase === "working" ? "Procesando" : "Activar micrófono"
   return <VoiceContext.Provider value={register}>{children}{target && createPortal(
-    <div className="voice-dock" data-state={available ? phase : "unavailable"}>
-      {message && <p className="voice-feedback" role={phase === "error" ? "alert" : "status"}>{message}</p>}
+    <><HoldHelp key={target.id.toString() + target.order} onExplain={explain} onClose={closeHelp} />
+    <div className="voice-dock" data-state={speaking ? "speaking" : available ? phase : "unavailable"}>
+      {(helpMessage || message) && <p className="voice-feedback" role={phase === "error" ? "alert" : "status"}><span className="voice-feedback-text">{helpMessage || message}{helpMessage && <small className="hold-help-dismiss">Suelta el botón para continuar.</small>}</span></p>}
       <div className="voice-dock-row">
-        <span className="voice-state" aria-live="polite">{!available ? "Sin micrófono" : phase === "listening" ? "Te escucho" : phase === "working" ? "Un momento" : phase === "error" ? "Intenta de nuevo" : "Micrófono apagado"}</span>
+        <span className="voice-state" aria-live="polite">{speaking ? "Hablando" : !available ? "Sin micrófono" : phase === "listening" ? "Te escucho" : phase === "working" ? "Un momento" : phase === "error" ? "Intenta de nuevo" : "Micrófono apagado"}</span>
         <button type="button" className="voice-orb" onClick={toggle} aria-label={label} aria-pressed={phase === "listening"} disabled={!available || phase === "working"} title={target.handler.current.hint}>
-          {phase === "listening" ? <Square aria-hidden="true" /> : phase === "working" ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : !available ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}
+          {speaking ? <Volume2 aria-hidden="true" /> : phase === "listening" ? <Square aria-hidden="true" /> : phase === "working" ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : !available ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}
         </button>
       </div>
-    </div>, target.host
+    </div></>, target.host
   )}</VoiceContext.Provider>
 }
 

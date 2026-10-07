@@ -32,7 +32,7 @@ export function SettingsScreen({ profile, onSave, onBack }: { profile: Profile; 
   }
   return <div className="flex flex-col gap-5">
     <ScreenHeader onBack={onBack} helpText="El tutor y tú pueden preparar el perfil en este teléfono. Marca las guías que te interesan. Guarda al terminar." />
-    <h1 className="text-4xl font-bold">Mi perfil y tutor</h1>
+    <h1 className="home-greeting">Mi perfil y tutor</h1>
     <VoiceCommand onCommand={command} hint="Di: mi nombre es…, mi teléfono es…, mi rutina es…, o guardar." />
     {([['name','Tu nombre'],['tutorName','Nombre del tutor'],['tutorPhone','Teléfono del tutor'],['phoneModel','Modelo del teléfono']] as const).map(([key, label]) => <div key={key} className="flex flex-col gap-2"><Label htmlFor={key}>{label}</Label><Input id={key} type={key === 'tutorPhone' ? 'tel' : 'text'} value={draft[key]} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></div>)}
     <Label htmlFor="routine">Rutina y necesidades</Label><Textarea id="routine" value={draft.routine} onChange={e => setDraft({ ...draft, routine: e.target.value })} />

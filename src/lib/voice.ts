@@ -12,7 +12,14 @@ const LANG = "es-MX"
 const isNative = Capacitor.isNativePlatform()
 let activeRecognition: WebRecognition | undefined
 let cancelRecognition: (() => void) | undefined
+let finishRecognition: (() => void) | undefined
+let finishRequested = false
 let listenVersion = 0
+/** Finaliza el dictado conservando lo reconocido; cancelar sigue descartándolo. */
+export function finishListening() {
+  finishRequested = true
+  finishRecognition?.()
+}
 export async function stopListening() {
   listenVersion++
   cancelRecognition?.()
@@ -67,9 +74,17 @@ async function pickSpanishVoice(): Promise<SpeechSynthesisVoice | undefined> {
   return voices.find((v) => v.name === forced) ?? voices.sort((a, b) => scoreVoice(b) - scoreVoice(a))[0]
 }
 
-export async function speak(text: string, { rate = 0.9 }: { rate?: number } = {}) {
+let speechVersion = 0
+export async function speak(text: string, options: { rate?: number } = {}) {
+  const version = ++speechVersion
+  window.dispatchEvent(new CustomEvent("iarecuerdo:speaking", { detail: true }))
+  try { await performSpeak(text, options, version) }
+  finally { if (version === speechVersion) window.dispatchEvent(new CustomEvent("iarecuerdo:speaking", { detail: false })) }
+}
+async function performSpeak(text: string, { rate = 0.9 }: { rate?: number }, version: number) {
   if (isNative) {
     await TextToSpeech.stop()
+    if (version !== speechVersion) return
     await TextToSpeech.speak({ text, lang: LANG, rate, pitch: 1, volume: 1, category: "playback" })
     return
   }
@@ -78,6 +93,7 @@ export async function speak(text: string, { rate = 0.9 }: { rate?: number } = {}
   synth.cancel()
   const u = new SpeechSynthesisUtterance(text)
   const voice = await pickSpanishVoice()
+  if (version !== speechVersion) return
   if (voice) u.voice = voice
   u.lang = voice?.lang ?? LANG
   u.rate = rate
@@ -89,6 +105,8 @@ export async function speak(text: string, { rate = 0.9 }: { rate?: number } = {}
 }
 
 export async function stopSpeaking() {
+  speechVersion++
+  window.dispatchEvent(new CustomEvent("iarecuerdo:speaking", { detail: false }))
   if (isNative) return TextToSpeech.stop()
   if ("speechSynthesis" in window) window.speechSynthesis.cancel()
 }
@@ -118,6 +136,7 @@ export function canListen() {
 /** Escucha una sola frase y devuelve el texto. */
 export async function listenOnce(): Promise<string> {
   const version = ++listenVersion
+  finishRequested = false
   if (isNative) {
     const { available } = await SpeechRecognition.available()
     if (!available) throw new Error("El reconocimiento de voz no está disponible en este teléfono.")
@@ -125,16 +144,29 @@ export async function listenOnce(): Promise<string> {
     const perm = await SpeechRecognition.requestPermissions()
     if (perm.speechRecognition !== "granted") throw new Error("Hace falta permiso para usar el micrófono.")
     if (version !== listenVersion) return ""
+    if (finishRequested) return ""
     return new Promise<string>((resolve, reject) => {
+      let settled = false
+      let finalTimer: ReturnType<typeof setTimeout> | undefined
       const finish = (text: string, error?: Error) => {
+        if (settled) return
+        settled = true
         clearTimeout(timeout)
+        clearTimeout(finalTimer)
         if (cancelRecognition === cancel) cancelRecognition = undefined
+        if (finishRecognition === submit) finishRecognition = undefined
         if (error) reject(error); else resolve(text)
       }
       const cancel = () => finish("")
+      const submit = () => {
+        if (settled || finalTimer) return
+        finalTimer = setTimeout(() => finish(""), 2000)
+        void SpeechRecognition.stop().catch(error => finish("", error instanceof Error ? error : new Error("No se pudo detener la escucha.")))
+      }
       // Las pausas son normales al hablar despacio: dejamos hasta 45 s en total.
       const timeout = setTimeout(() => { void SpeechRecognition.stop(); finish("", new Error("Se agotó la escucha. Toca el micrófono para intentarlo otra vez.")) }, 45000)
       cancelRecognition = cancel
+      finishRecognition = submit
       SpeechRecognition.start({ language: LANG, maxResults: 1, partialResults: false, popup: false })
         .then(res => finish(res.matches?.[0] ?? ""), error => finish("", error instanceof Error ? error : new Error("No se pudo escuchar.")))
     })
@@ -144,30 +176,47 @@ export async function listenOnce(): Promise<string> {
   const rec = new Ctor()
   activeRecognition = rec
   rec.lang = LANG
-  rec.interimResults = false
+  rec.interimResults = true
   rec.maxAlternatives = 1
   return new Promise<string>((resolve, reject) => {
     let text = ""
     let settled = false
     let graceTimer: ReturnType<typeof setTimeout> | undefined
+    let finalTimer: ReturnType<typeof setTimeout> | undefined
+    let ended = false
+    let submitting = false
     const finish = (error?: Error) => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
       if (graceTimer) clearTimeout(graceTimer)
+      clearTimeout(finalTimer)
       if (activeRecognition === rec) activeRecognition = undefined
       if (cancelRecognition === cancel) cancelRecognition = undefined
+      if (finishRecognition === submit) finishRecognition = undefined
       if (error) reject(error); else resolve(text)
     }
-    const cancel = () => { text = ""; rec.stop(); finish() }
+    const cancel = () => { text = ""; finish(); rec.stop() }
+    const submit = () => {
+      if (settled || submitting) return
+      submitting = true
+      clearTimeout(graceTimer)
+      if (ended) { finish(); return }
+      // El motor puede enviar una última transcripción después de stop().
+      finalTimer = setTimeout(() => finish(), 1500)
+      try { rec.stop() } catch { finish() }
+    }
     // SpeechRecognition termina al detectar silencio; esperamos cinco segundos
     // antes de cerrar para que la persona pueda pensar y continuar con calma.
     const timeout = setTimeout(() => { rec.stop(); finish(new Error("Se agotó el tiempo de escucha. Inténtalo otra vez.")) }, 45000)
     cancelRecognition = cancel
-    rec.onresult = e => { text = e.results[0]?.[0]?.transcript ?? "" }
+    finishRecognition = submit
+    rec.onresult = e => { if (!settled) text = Array.from(e.results, result => result[0]?.transcript ?? "").join(" ").trim() }
     rec.onerror = e => finish(new Error(e.error === "not-allowed" ? "Hace falta permiso para usar el micrófono." : "No se escuchó bien. Intenta otra vez."))
     rec.onend = () => {
       if (settled) return
+      ended = true
+      if (submitting) { finish(); return }
       graceTimer = setTimeout(() => finish(), 5000)
     }
     try { rec.start() } catch (error) { finish(error instanceof Error ? error : new Error("No se pudo iniciar el micrófono.")) }
