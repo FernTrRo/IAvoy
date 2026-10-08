@@ -8,7 +8,7 @@ import { ScreenHeader } from "@/components/screen-header"
 import { SpeakButton } from "@/components/speak-button"
 import { formatToday, formatWhen } from "@/lib/format"
 import { VoiceCommand } from "@/components/voice-command"
-import { isIntent } from "@/lib/commands"
+import { isIntent, learnRequest } from "@/lib/commands"
 import { type Reminder } from "@/data/demo"
 
 type Props = {
@@ -20,10 +20,12 @@ type Props = {
   onDailyQuestion: (v: boolean) => void
   onNewReminder: (phrase?: string) => void
   onGuide: () => void
+  /** "Quiero aprender a…" dicho en el inicio: abre la pantalla de nueva guía con esa frase. */
+  onNewGuide: (phrase?: string) => void
   onList: () => void
 }
 
-export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQuestion, onDailyQuestion, onNewReminder, onGuide, onList }: Props) {
+export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQuestion, onDailyQuestion, onNewReminder, onGuide, onNewGuide, onList }: Props) {
   const name = userName.trim()
   const greetings = [
     `¿Cómo estás hoy${name ? `, ${name}` : ""}?`,
@@ -47,7 +49,7 @@ export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQues
   }, [greetingIndex])
   return (
     <div className="flex flex-col gap-7">
-      <ScreenHeader helpText="Toca el micrófono circular y dime qué necesitas. Puedes pedir un aviso o abrir tus actividades." />
+      <ScreenHeader helpText="Toca el micrófono circular y dime qué necesitas. Puedes pedir un aviso, abrir tus actividades o decir qué quieres aprender." />
 
       <section>
         <h1 className="home-greeting">{greetings[greetingIndex]}</h1>
@@ -92,12 +94,13 @@ export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQues
         </div>
       </section>
 
-      <VoiceCommand hint="Di crear aviso, mis avisos, mis guías o mi perfil." onCommand={text => {
+      <VoiceCommand hint="Di crear aviso, mis avisos, mis guías, quiero aprender a… o mi perfil." onCommand={text => {
         if (isIntent(text, "new")) onNewReminder(text)
+        else if (learnRequest(text)) onNewGuide(text)
         else if (isIntent(text, "reminders")) onList()
         else if (isIntent(text, "guides")) onGuide()
         else if (isIntent(text, "profile")) onSettings()
-        else throw new Error("Puedes decir: hacer un aviso, ver pendientes, aprender o mi perfil.")
+        else throw new Error("Puedes decir: hacer un aviso, ver pendientes, quiero aprender a… o mi perfil.")
       }} />
       <Card className="flex-row items-center justify-between gap-4">
         <Label htmlFor="daily" className="text-lg leading-snug font-normal">

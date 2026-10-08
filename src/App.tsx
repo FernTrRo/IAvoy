@@ -7,6 +7,8 @@ import { HomeScreen } from "@/screens/home"
 import { NewReminderScreen } from "@/screens/new-reminder"
 import { RemindersScreen } from "@/screens/reminders"
 import { GuideListScreen, GuideScreen } from "@/screens/guide"
+import { NewGuideScreen } from "@/screens/new-guide"
+import { aiAvailable } from "@/lib/ai"
 import { demoReminders, guides, type Reminder } from "@/data/demo"
 import { load, save } from "@/lib/storage"
 import { SettingsScreen } from "@/screens/settings"
@@ -22,6 +24,7 @@ type Screen =
   | { name: "list" }
   | { name: "guides" }
   | { name: "guide"; id: string }
+  | { name: "new-guide"; phrase?: string }
 
 export default function App() {
   const [profile, setProfile] = useState(() => load("profile", defaultProfile))
@@ -92,6 +95,8 @@ export default function App() {
     toast.success(`Aviso guardado para ${formatWhen(r.when).toLowerCase()}`)
     setScreen({ name: "home" })
   }
+  // Sin llave de IA no se pueden crear guías: se abre la lista de ejemplo.
+  const newGuide = (phrase?: string) => setScreen(aiAvailable() ? { name: "new-guide", phrase } : { name: "guides" })
   const openGuide = (id: string) => { setLastGuide(id); save("lastGuide", id); setScreen({ name: "guide", id }) }
   const saveProfile = (p: Profile) => {
     if (!save("profile", p)) { toast.error("No se pudo guardar el perfil."); return }
@@ -118,6 +123,7 @@ export default function App() {
           onDailyQuestion={setDailyQuestion}
           onNewReminder={phrase => setScreen({ name: "new", phrase })}
           onGuide={() => setScreen({ name: "guides" })}
+          onNewGuide={newGuide}
           onList={() => setScreen({ name: "list" })}
         />
       )}
@@ -134,7 +140,10 @@ export default function App() {
         />
       )}
       {screen.name === "guides" && (
-        <GuideListScreen progress={progress} onBack={() => setScreen({ name: "home" })} onOpen={openGuide} />
+        <GuideListScreen progress={progress} onBack={() => setScreen({ name: "home" })} onOpen={openGuide} onNewGuide={newGuide} />
+      )}
+      {screen.name === "new-guide" && (
+        <NewGuideScreen key={screen.phrase ?? "new-guide"} initialPhrase={screen.phrase} onCancel={() => setScreen({ name: "guides" })} onCreated={openGuide} />
       )}
       {screen.name === "guide" && (
         <GuideScreen
@@ -150,7 +159,7 @@ export default function App() {
         />
       )}
 
-      {screen.name === "settings" && <SettingsScreen profile={profile} onSave={saveProfile} onBack={() => setScreen({ name: "home" })} />}
+      {screen.name === "settings" && <SettingsScreen profile={profile} onSave={saveProfile} onBack={() => setScreen({ name: "home" })} onOpenGuide={openGuide} />}
       <ReminderAlert reminder={alerting} onDone={markDone} onLater={snooze} onDismiss={dismiss} />
       <Toaster />
     </div></VoiceProvider>

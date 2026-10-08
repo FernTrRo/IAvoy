@@ -37,6 +37,15 @@ export function guideTopic(text: string): string | null {
   if (/\b(whatsapp|audios?|notas? de voz|mensajes? de voz)\b/.test(s)) return "whatsapp-nota"
   return null
 }
+/**
+ * Detecta "quiero aprender a…", "enséñame a…", "cómo se…" y devuelve el tema.
+ * speechText ya quita "quiero", "me gustaría", etc., por eso empieza en "aprender".
+ */
+export function learnRequest(text: string): string | null {
+  const m = speechText(text).match(/^(?:aprender(?: a\b| como\b)?|ensename(?: a\b| como\b)?|explicame como|como (?:se |puedo )?)\s*(.+)$/)
+  if (!m || /^algo(?: nuevo)?$/.test(m[1])) return null
+  return m[1].trim() || null
+}
 export function reminderTarget(text: string) {
   const m = speechText(text).match(/^(modificar|modifica|editar|edita|cambiar|cambia|cancelar|cancela|quitar|quita|eliminar|elimina|borrar|borra) (?:el |mi )?(?:(?:aviso|recordatorio) (?:de |para )?)?(.+)$/)
   return m ? { action: /^(cancel|quit|elimin|borr)/.test(m[1]) ? "cancel" : "edit", name: m[2] } : null

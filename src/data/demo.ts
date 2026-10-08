@@ -15,7 +15,8 @@ export type Reminder = {
 }
 
 export type GuideStep = { title: string; body: string }
-export type Guide = { id: string; title: string; steps: GuideStep[] }
+/** source "ai" = guía creada con IA (se guarda en el teléfono). */
+export type Guide = { id: string; title: string; steps: GuideStep[]; source?: "demo" | "ai"; createdAt?: string }
 
 const at = (hoursFromNow: number, minutes = 0) => {
   const d = new Date()
