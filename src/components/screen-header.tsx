@@ -1,21 +1,19 @@
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { HelpDialog } from "@/components/help-dialog"
 
-type Props = { onBack?: () => void; helpText: string }
+type Props = {
+  onBack?: () => void
+  helpText?: string
+}
 
-/** Barra superior: "Volver" a la izquierda, "Ayuda" siempre a la derecha. */
-export function ScreenHeader({ onBack, helpText }: Props) {
+/** Barra superior: solo el botón "Volver".*/
+export function ScreenHeader({ onBack }: Props) {
+  if (!onBack) return null
   return (
-    <header className="flex items-center justify-between gap-3">
-      {onBack ? (
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft /> Volver
-        </Button>
-      ) : (
-        <span />
-      )}
-      <HelpDialog helpText={helpText} />
+    <header className="flex items-center">
+      <Button variant="outline" onClick={onBack}>
+        <ArrowLeft /> Volver
+      </Button>
     </header>
   )
 }

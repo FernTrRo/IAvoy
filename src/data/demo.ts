@@ -14,7 +14,9 @@ export type Reminder = {
   cancelled?: boolean
 }
 
-export type GuideStep = { title: string; body: string }
+/** Imagen de apoyo de un paso: pictograma de ARASAAC o logotipo de la app (Simple Icons). */
+export type StepImage = { src: string; alt: string; kind: "pictogram" | "logo" }
+export type GuideStep = { title: string; body: string; image?: StepImage }
 /** source "ai" = guía creada con IA (se guarda en el teléfono). */
 export type Guide = { id: string; title: string; steps: GuideStep[]; source?: "demo" | "ai"; createdAt?: string }
 

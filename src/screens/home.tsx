@@ -2,9 +2,6 @@ import { useEffect, useState } from "react"
 import { BookOpen, ListChecks, Mic, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { ScreenHeader } from "@/components/screen-header"
 import { SpeakButton } from "@/components/speak-button"
 import { formatToday, formatWhen } from "@/lib/format"
 import { VoiceCommand } from "@/components/voice-command"
@@ -16,8 +13,6 @@ type Props = {
   onSettings: () => void
   next?: Reminder
   pendingCount: number
-  dailyQuestion: boolean
-  onDailyQuestion: (v: boolean) => void
   onNewReminder: (phrase?: string) => void
   onGuide: () => void
   /** "Quiero aprender a…" dicho en el inicio: abre la pantalla de nueva guía con esa frase. */
@@ -25,7 +20,7 @@ type Props = {
   onList: () => void
 }
 
-export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQuestion, onDailyQuestion, onNewReminder, onGuide, onNewGuide, onList }: Props) {
+export function HomeScreen({ userName, onSettings, next, pendingCount, onNewReminder, onGuide, onNewGuide, onList }: Props) {
   const name = userName.trim()
   const greetings = [
     `¿Cómo estás hoy${name ? `, ${name}` : ""}?`,
@@ -49,8 +44,6 @@ export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQues
   }, [greetingIndex])
   return (
     <div className="flex flex-col gap-7">
-      <ScreenHeader helpText="Toca el micrófono circular y dime qué necesitas. Puedes pedir un aviso, abrir tus actividades o decir qué quieres aprender." />
-
       <section>
         <h1 className="home-greeting">{greetings[greetingIndex]}</h1>
         <p className="mt-1 text-xl text-muted-foreground">{formatToday()}</p>
@@ -102,12 +95,6 @@ export function HomeScreen({ userName, onSettings, next, pendingCount, dailyQues
         else if (isIntent(text, "profile")) onSettings()
         else throw new Error("Puedes decir: hacer un aviso, ver pendientes, quiero aprender a… o mi perfil.")
       }} />
-      <Card className="flex-row items-center justify-between gap-4">
-        <Label htmlFor="daily" className="text-lg leading-snug font-normal">
-          Preguntarme por mis pendientes cada día
-        </Label>
-        <Switch id="daily" checked={dailyQuestion} onCheckedChange={onDailyQuestion} />
-      </Card>
     </div>
   )
 }

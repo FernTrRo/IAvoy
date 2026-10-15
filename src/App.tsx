@@ -14,7 +14,6 @@ import { load, save } from "@/lib/storage"
 import { SettingsScreen } from "@/screens/settings"
 import { defaultProfile, type Profile } from "@/lib/profile"
 import { acknowledge, completeReminder, dueAt } from "@/lib/reminders"
-import { speak } from "@/lib/voice"
 import { formatWhen } from "@/lib/format"
 
 type Screen =
@@ -28,18 +27,15 @@ type Screen =
 
 export default function App() {
   const [profile, setProfile] = useState(() => load("profile", defaultProfile))
-  const [dailyShown, setDailyShown] = useState(() => load("dailyShown", ""))
   const [screen, setScreen] = useState<Screen>({ name: "home" })
   const [reminders, setReminders] = useState<Reminder[]>(() => load("reminders", demoReminders))
   const [progress, setProgress] = useState<Record<string, number>>(() => load("progress", {}))
   const [, setLastGuide] = useState<string>(() => load("lastGuide", guides[0].id))
-  const [dailyQuestion, setDailyQuestion] = useState(() => load("dailyQuestion", false))
   const [alerting, setAlerting] = useState<Reminder | null>(null)
 
   useEffect(() => { save("reminders", reminders) }, [reminders])
   useEffect(() => { save("progress", progress) }, [progress])
 
-  useEffect(() => { save("dailyQuestion", dailyQuestion) }, [dailyQuestion])
   useEffect(() => { window.scrollTo(0, 0) }, [screen])
 
   useEffect(() => {
@@ -98,18 +94,12 @@ export default function App() {
   // Sin llave de IA no se pueden crear guías: se abre la lista de ejemplo.
   const newGuide = (phrase?: string) => setScreen(aiAvailable() ? { name: "new-guide", phrase } : { name: "guides" })
   const openGuide = (id: string) => { setLastGuide(id); save("lastGuide", id); setScreen({ name: "guide", id }) }
+  // El perfil se queda abierto al guardar: ahí mismo se muestran las guías que se están preparando.
   const saveProfile = (p: Profile) => {
-    if (!save("profile", p)) { toast.error("No se pudo guardar el perfil."); return }
-    setProfile(p); toast.success("Perfil guardado"); setScreen({ name: "home" })
+    if (!save("profile", p)) { toast.error("No se pudo guardar el perfil."); return false }
+    setProfile(p)
+    return true
   }
-  useEffect(() => {
-    const today = new Date().toDateString()
-    if (dailyQuestion && dailyShown !== today && screen.name === "home" && !alerting) {
-      setDailyShown(today); save("dailyShown", today)
-      toast("¿Algo que recordar hoy?", { duration: 10000, action: { label: "Añadir", onClick: () => setScreen({ name: "new" }) } })
-      void speak("¿Quieres agregar algo para recordar hoy?").catch(() => {})
-    }
-  }, [dailyQuestion, dailyShown, screen.name, alerting])
 
   return (
     <VoiceProvider><div className="safe-area mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5">
@@ -119,8 +109,6 @@ export default function App() {
           onSettings={() => setScreen({ name: "settings" })}
           next={next}
           pendingCount={pending.length}
-          dailyQuestion={dailyQuestion}
-          onDailyQuestion={setDailyQuestion}
           onNewReminder={phrase => setScreen({ name: "new", phrase })}
           onGuide={() => setScreen({ name: "guides" })}
           onNewGuide={newGuide}
@@ -159,7 +147,7 @@ export default function App() {
         />
       )}
 
-      {screen.name === "settings" && <SettingsScreen profile={profile} onSave={saveProfile} onBack={() => setScreen({ name: "home" })} onOpenGuide={openGuide} />}
+      {screen.name === "settings" && <SettingsScreen profile={profile} onSave={saveProfile} onBack={() => setScreen({ name: "home" })} onOpenGuide={openGuide} onOpenGuides={() => setScreen({ name: "guides" })} />}
       <ReminderAlert reminder={alerting} onDone={markDone} onLater={snooze} onDismiss={dismiss} />
       <Toaster />
     </div></VoiceProvider>
