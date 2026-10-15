@@ -40,6 +40,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Dictado de avisos (el micrófono solo se activa al tocar el botón) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- Android 11+: permitir encontrar los servicios de voz del teléfono -->
     <queries>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { VoiceProvider } from "@/components/voice-command"
 import { Toaster } from "@/components/ui/sonner"
@@ -15,6 +15,7 @@ import { SettingsScreen } from "@/screens/settings"
 import { defaultProfile, type Profile } from "@/lib/profile"
 import { acknowledge, completeReminder, dueAt } from "@/lib/reminders"
 import { formatWhen } from "@/lib/format"
+import { requestPermission, setupNotifications, syncNotifications, type NotificationHandlers } from "@/lib/notifications"
 
 type Screen =
   | { name: "home" }
@@ -90,7 +91,36 @@ export default function App() {
     if (!updateReminders(next)) return
     toast.success(`Aviso guardado para ${formatWhen(r.when).toLowerCase()}`)
     setScreen({ name: "home" })
+    // El permiso se pide aquí, cuando ya se entiende para qué es. Luego se programan las notificaciones.
+    void requestPermission().then(ok => {
+      if (!ok) toast("Para que el teléfono te avise con la app cerrada, permite las notificaciones en Ajustes.", { duration: 8000 })
+      void syncNotifications(next)
+    })
   }
+
+  /* ---------- Notificaciones del sistema (como una app de recordatorios) ---------- */
+  // Las acciones de la notificación usan siempre la versión más reciente de los avisos.
+  const notificationHandlers = useRef<NotificationHandlers>(null!)
+  notificationHandlers.current = {
+    onDone: markDone,
+    onLater: id => snooze(id),
+    onOpen: id => {
+      const r = reminders.find(item => item.id === id && !item.done && !item.cancelled)
+      if (r) { setScreen({ name: "home" }); setAlerting(r) }
+    },
+  }
+  useEffect(() => {
+    let cleanup: (() => void) | undefined
+    let cancelled = false
+    void setupNotifications({
+      onDone: id => notificationHandlers.current.onDone(id),
+      onLater: id => notificationHandlers.current.onLater(id),
+      onOpen: id => notificationHandlers.current.onOpen(id),
+    }).then(fn => { if (cancelled) fn(); else cleanup = fn })
+    return () => { cancelled = true; cleanup?.() }
+  }, [])
+  // Cada cambio en los avisos (nuevo, hecho, pospuesto, cancelado) reprograma las notificaciones.
+  useEffect(() => { void syncNotifications(reminders) }, [reminders])
   // Sin llave de IA no se pueden crear guías: se abre la lista de ejemplo.
   const newGuide = (phrase?: string) => setScreen(aiAvailable() ? { name: "new-guide", phrase } : { name: "guides" })
   const openGuide = (id: string) => { setLastGuide(id); save("lastGuide", id); setScreen({ name: "guide", id }) }
