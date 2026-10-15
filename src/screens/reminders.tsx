@@ -1,7 +1,9 @@
 import { useState } from "react"
 import { VoiceCommand } from "@/components/voice-command"
 import { isIntent, reminderTarget, speechText } from "@/lib/commands"
-import { Check, Plus, Trash2 } from "lucide-react"
+import { Bell, Check, Plus, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+import { testNotification } from "@/lib/notifications"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ScreenHeader } from "@/components/screen-header"
@@ -87,7 +89,15 @@ export function RemindersScreen({ onEdit, onCancel, reminders, onBack, onDone, o
         </section>
       )}
 
-      <Button variant="ghost" size="sm" className="mt-6 self-center text-muted-foreground" onClick={onResetDemo}>
+      {/* Prueba rápida: confirma que el teléfono muestra las notificaciones de IAvoy. */}
+      <Button variant="outline" className="mt-6 self-center" onClick={async () => {
+        const result = await testNotification()
+        if (result.ok) toast.success(result.message, { duration: 10000 }); else toast.error(result.message, { duration: 15000 })
+      }}>
+        <Bell aria-hidden="true" /> Probar notificación
+      </Button>
+
+      <Button variant="ghost" size="sm" className="self-center text-muted-foreground" onClick={onResetDemo}>
         Restablecer datos de demostración
       </Button>
     </div>

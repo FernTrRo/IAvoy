@@ -132,7 +132,8 @@ export async function syncNotifications(reminders: Reminder[]) {
         })),
       })
     } catch (e) {
-      if (import.meta.env.DEV) console.warn("[Avisos] No se pudieron programar las notificaciones.", e)
+      // Se muestra siempre (también en el APK) para poder revisarlo con chrome://inspect.
+      console.warn("[Avisos] No se pudieron programar las notificaciones.", e)
     }
     return
   }
@@ -148,5 +149,43 @@ export async function syncNotifications(reminders: Reminder[]) {
       const n = new Notification(texts(r).title, { body: texts(r).body, tag: r.id, requireInteraction: true, icon: "/icon.svg" })
       n.onclick = () => { window.focus(); handlers?.onOpen(r.id); n.close() }
     }, delay))
+  }
+}
+
+/* ---------- Prueba ---------- */
+
+/**
+ * Prueba de notificaciones: muestra una al instante y programa otra a los 10 segundos.
+ * Devuelve un mensaje que explica qué pasó, para mostrarlo en pantalla.
+ */
+export async function testNotification(): Promise<{ ok: boolean; message: string }> {
+  try {
+    if (!(await requestPermission())) {
+      return { ok: false, message: "Falta el permiso. Ve a Ajustes → Aplicaciones → IAvoy → Notificaciones y actívalas." }
+    }
+    if (!isNative) {
+      new Notification("Prueba de IAvoy", { body: "Así se verán tus avisos.", icon: "/icon.svg" })
+      return { ok: true, message: "Listo. En la computadora solo llegan con esta pestaña abierta." }
+    }
+    // Por si el canal no existía todavía.
+    await LocalNotifications.createChannel({ id: CHANNEL, name: "Avisos", description: "Recordatorios que creaste en IAvoy", importance: 5, visibility: 1, vibration: true })
+    let exact = "granted"
+    try { exact = (await LocalNotifications.checkExactNotificationSetting()).exact_alarm } catch { /* Android viejo: no aplica */ }
+
+    await LocalNotifications.schedule({
+      notifications: [
+        { id: 2_000_000_101, title: "Prueba de IAvoy", body: "Esta llegó al instante.", channelId: CHANNEL },
+        {
+          id: 2_000_000_102, title: "Prueba de IAvoy", body: "Esta llegó a los 10 segundos.", channelId: CHANNEL,
+          actionTypeId: ACTION_TYPE, schedule: { at: new Date(Date.now() + 10_000), allowWhileIdle: true },
+        },
+      ],
+    })
+    const pending = (await LocalNotifications.getPending()).notifications.length
+    const warning = exact !== "granted" ? " Ojo: falta activar «Alarmas y recordatorios», por eso pueden llegar tarde." : ""
+    return { ok: true, message: `Enviada. Debe llegar una ahora y otra en 10 segundos; puedes cerrar la app para verla. Programadas: ${pending}.${warning}` }
+  } catch (e) {
+    console.warn("[Avisos] Falló la prueba de notificaciones.", e)
+    return { ok: false, message: `Android no dejó mostrarla: ${(e as Error)?.message ?? e}` }
   }
 }
