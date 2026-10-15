@@ -2,7 +2,8 @@
  * Generación de guías con IA 
  */
 import type { Guide } from "@/data/demo"
-import { APPS, withImages } from "@/lib/images"
+import { APPS } from "@/lib/images"
+import { ICON_CHOICES, POSITION_CHOICES, normalizeUi } from "@/lib/ui-hints"
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined
 const MODEL = (import.meta.env.VITE_GEMINI_MODEL as string | undefined) ?? "gemini-3.5-flash"
@@ -33,7 +34,7 @@ La persona puede escribir los nombres de las aplicaciones como suenan o con erro
 Seguridad: nunca pidas escribir contraseñas, NIP, códigos de verificación ni datos de tarjetas.
 Si el tema toca dinero, bancos o compras, agrega un paso que recuerde no compartir códigos con nadie.
 Los textos se leerán en voz alta: usa buena puntuación y signos de interrogación completos (¿…?).
-Cada paso lleva una imagen de apoyo: indica la aplicación si el paso trata de abrirla o reconocerla, y palabras clave simples para buscar un pictograma de la acción.`
+Cada paso lleva una imagen del botón que hay que tocar, tal como se ve en la pantalla, y dónde está. Elige el ícono que la persona realmente verá en su teléfono en ESE paso.`
 
 /* ---------- llamada genérica ---------- */
 
@@ -160,15 +161,18 @@ const stepSchema = {
     body: { type: "STRING", description: "Cómo hacerlo, máximo 2 frases cortas." },
     app: {
       type: "STRING",
-      description: `Si el paso es abrir o reconocer una aplicación, su identificador: ${Object.keys(APPS).join(", ")}. Si no, escribe "ninguna".`,
+      description: `La aplicación en la que ocurre este paso, con uno de estos identificadores: ${Object.keys(APPS).join(", ")}. Escribe "ninguna" si es otra aplicación, la pantalla de inicio o los ajustes del teléfono.`,
     },
-    keywords: {
-      type: "ARRAY",
-      description: "De 1 a 3 palabras sueltas en español para buscar un pictograma que ilustre la acción del paso. Usa palabras simples y concretas, de la más precisa a la más general (por ejemplo: micrófono, hablar, teléfono).",
-      items: { type: "STRING" },
+    icon: {
+      type: "STRING",
+      description: `El botón o ícono que se toca o se busca en este paso, tal como aparece en la pantalla. Uno de: ${ICON_CHOICES}. Usa "app" solo cuando el paso es abrir la aplicación desde la pantalla de inicio. Escribe "none" si el paso no tiene un botón claro (por ejemplo, esperar o hablar).`,
+    },
+    position: {
+      type: "STRING",
+      description: `Dónde está ese botón en la pantalla. Uno de: ${POSITION_CHOICES}. Debe coincidir con lo que dice el texto del paso.`,
     },
   },
-  required: ["title", "body", "app", "keywords"],
+  required: ["title", "body", "app", "icon", "position"],
 }
 
 const stepsSchema = { type: "ARRAY", description: "Entre 3 y 8 pasos.", items: stepSchema }
@@ -187,25 +191,18 @@ const guideSchema = {
   required: ["suitable", "title", "steps"],
 }
 
-type RawStep = { title: string; body: string; app?: string; keywords?: string[] }
+type RawStep = { title: string; body: string; app?: string; icon?: string; position?: string }
 
-/** Limpia los pasos, busca sus imágenes y arma la guía. */
+/** Limpia los pasos, les agrega su pista visual (qué botón y dónde) y arma la guía. */
 async function buildGuide(rawTitle: string, rawSteps: RawStep[] | undefined, fallbackTitle: string): Promise<Guide> {
-  const raw = (rawSteps ?? [])
-    .map((s) => ({
-      title: clean(s.title, 60),
-      body: clean(s.body, 240),
-      hint: { app: clean(s.app, 30), keywords: (s.keywords ?? []).map((k) => clean(k, 30)).filter(Boolean) },
-    }))
+  const steps = (rawSteps ?? [])
+    .map((s) => {
+      const ui = normalizeUi({ icon: s.icon, position: s.position, app: s.app })
+      return { title: clean(s.title, 60), body: clean(s.body, 240), ...(ui ? { ui } : {}) }
+    })
     .filter((s) => s.title && s.body)
     .slice(0, 8)
-  if (raw.length < 2) throw new Error("La guía salió incompleta. Intenta con otras palabras.")
-
-  // Imágenes de apoyo (logotipo de la app o pictograma). Si no se encuentran, el paso queda solo con texto.
-  const steps = await withImages(
-    raw.map(({ title, body }) => ({ title, body })),
-    raw.map((s) => s.hint),
-  )
+  if (steps.length < 2) throw new Error("La guía salió incompleta. Intenta con otras palabras.")
   const title = clean(rawTitle, 80) || clean(fallbackTitle, 80)
   return { id: `ia-${slug(title)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, title, steps, source: "ai", createdAt: new Date().toISOString() }
 }

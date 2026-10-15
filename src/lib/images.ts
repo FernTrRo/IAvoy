@@ -11,7 +11,7 @@
 import type { GuideStep, StepImage } from "@/data/demo"
 
 export const ARASAAC_CREDIT =
-  ""
+  "Pictogramas de ARASAAC (arasaac.org), creados por Sergio Palao. Propiedad del Gobierno de Aragón. Licencia CC BY-NC-SA."
 
 /* ---------- Logotipos ---------- */
 
@@ -54,38 +54,58 @@ const logo = (app: { name: string; slug: string }): StepImage => ({
 /* ---------- Pictogramas de ARASAAC ---------- */
 
 /** Solo se guardan los resultados reales; si falló la conexión, se vuelve a intentar la próxima vez. */
-const cache = new Map<string, number | null>()
+/** Avisos en la consola solo mientras se desarrolla. */
+const DEV = !!import.meta.env?.DEV
+
+const cache = new Map<string, number[]>()
 
 const unaccent = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").normalize("NFC")
 
-/** Una búsqueda en ARASAAC. Devuelve el número del pictograma, null si no hay, o undefined si falló la conexión. */
-async function query(text: string): Promise<number | null | undefined> {
+type ArasaacResult = { _id?: number; sex?: boolean; violence?: boolean; keywords?: { keyword?: string }[] }
+
+/**
+ * Una búsqueda en ARASAAC. Devuelve los pictogramas ordenados del más al menos preciso,
+ * [] si no hay, o undefined si falló la conexión.
+ */
+async function query(text: string): Promise<number[] | undefined> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 8000)
   try {
     const res = await fetch(`https://api.arasaac.org/v1/pictograms/es/search/${encodeURIComponent(text)}`, { signal: controller.signal })
-    if (res.status === 404) return null // ARASAAC responde 404 cuando no encuentra nada
+    if (res.status === 404) return [] // ARASAAC responde 404 cuando no encuentra nada
     if (!res.ok) return undefined
-    const list = (await res.json()) as { _id?: number }[]
-    return Array.isArray(list) && typeof list[0]?._id === "number" ? list[0]._id : null
+    const list = (await res.json()) as ArasaacResult[]
+    if (!Array.isArray(list)) return []
+    const wanted = unaccent(text.toLowerCase())
+    // Más puntos si una de sus palabras es exactamente la buscada (ej. "lupa" y no "lupa de joyero").
+    const score = (p: ArasaacResult) => {
+      const words = (p.keywords ?? []).map((k) => unaccent((k.keyword ?? "").toLowerCase()))
+      return words.includes(wanted) ? 2 : words.some((w) => w.startsWith(wanted)) ? 1 : 0
+    }
+    return list
+      .filter((p) => typeof p._id === "number" && !p.sex && !p.violence)
+      .map((p, i) => ({ id: p._id!, points: score(p), i }))
+      .sort((a, b) => b.points - a.points || a.i - b.i)
+      .slice(0, 6)
+      .map((p) => p.id)
   } catch (e) {
-    if (import.meta.env.DEV) console.warn(`[Imágenes] No se pudo consultar ARASAAC para "${text}".`, e)
+    if (DEV) console.warn(`[Imágenes] No se pudo consultar ARASAAC para "${text}".`, e)
     return undefined
   } finally {
     clearTimeout(timer)
   }
 }
 
-/** Busca un pictograma por palabra en español (con y sin acentos) y devuelve su número, o null si no hay. */
-async function searchPictogram(keyword: string): Promise<number | null> {
+/** Busca pictogramas por palabra en español (con y sin acentos). */
+async function searchPictograms(keyword: string): Promise<number[]> {
   const key = keyword.trim().toLowerCase()
-  if (!key) return null
+  if (!key) return []
   if (cache.has(key)) return cache.get(key)!
-  let id = await query(key)
-  if (id === null && unaccent(key) !== key) id = await query(unaccent(key))
-  if (id !== undefined) cache.set(key, id)
-  if (import.meta.env.DEV && id === null) console.info(`[Imágenes] Sin pictograma para "${key}".`)
-  return id ?? null
+  let ids = await query(key)
+  if (ids?.length === 0 && unaccent(key) !== key) ids = await query(unaccent(key))
+  if (ids !== undefined) cache.set(key, ids)
+  if (DEV && ids?.length === 0) console.info(`[Imágenes] Sin pictograma para "${key}".`)
+  return ids ?? []
 }
 
 const pictogram = (id: number, keyword: string): StepImage => ({
@@ -99,22 +119,49 @@ const pictogram = (id: number, keyword: string): StepImage => ({
 /** Lo que la IA sugiere para ilustrar un paso. */
 export type StepHint = { app?: string; keywords?: string[] }
 
-/**
- * Elige la imagen de un paso: primero el logotipo si el paso trata de una app,
- * si no, el primer pictograma que exista para las palabras sugeridas.
- */
-export async function findStepImage(hint: StepHint): Promise<StepImage | undefined> {
-  const app = matchApp(hint.app)
-  if (app) return logo(app)
-  for (const keyword of (hint.keywords ?? []).slice(0, 3)) {
-    const id = await searchPictogram(keyword)
-    if (id !== null) return pictogram(id, keyword)
-  }
-  return undefined
-}
+/** Palabras que no sirven para buscar un pictograma (nombres de apps, palabras vacías). */
+const USELESS = new Set([...Object.keys(APPS), ...Object.values(APPS).map((a) => a.name.toLowerCase()), "app", "aplicacion", "aplicación", "pantalla", "telefono", "teléfono", "celular", "boton", "botón", "icono", "ícono", "opcion", "opción"])
 
-/** Agrega imágenes a todos los pasos al mismo tiempo. Nunca falla: si algo sale mal, el paso queda sin imagen. */
+/** El paso trata de abrir o reconocer la app (ahí sí va el logotipo grande). */
+const opensApp = (step: GuideStep, appName: string) =>
+  new RegExp(`\\b(abr[ea]|abrir|entra|busca el [ií]cono|toca el [ií]cono)\\b|${appName}`, "i").test(`${step.title} ${step.body}`)
+
+/**
+ * Elige la imagen de cada paso, mirando la guía completa para no repetir:
+ * - El logotipo grande de una app aparece UNA sola vez: en el paso que la abre (o la primera vez que aparece).
+ * - Los demás pasos llevan un pictograma de la acción, con el logotipo pequeño en la esquina como recordatorio.
+ * - Ningún pictograma se repite en la misma guía: si ya se usó, se toma el siguiente resultado o la siguiente palabra.
+ * - Si no hay un pictograma nuevo, el paso queda sin imagen (mejor que repetir la misma).
+ */
 export async function withImages(steps: GuideStep[], hints: StepHint[]): Promise<GuideStep[]> {
-  const images = await Promise.all(steps.map((_, i) => findStepImage(hints[i] ?? {}).catch(() => undefined)))
-  return steps.map((step, i) => (images[i] ? { ...step, image: images[i] } : step))
+  const keywordsOf = (h: StepHint | undefined) =>
+    (h?.keywords ?? []).map((k) => k.trim()).filter((k) => k && !USELESS.has(k.toLowerCase())).slice(0, 3)
+
+  // Todas las búsquedas al mismo tiempo (rápido); la elección se hace después, en orden.
+  const results = await Promise.all(steps.map((_, i) =>
+    Promise.all(keywordsOf(hints[i]).map(async (k) => ({ keyword: k, ids: await searchPictograms(k).catch(() => []) }))),
+  ))
+
+  const usedPictograms = new Set<number>()
+  const shownLogos = new Set<string>()
+  return steps.map((step, i) => {
+    const app = matchApp(hints[i]?.app)
+    let image: StepImage | undefined
+
+    if (app && !shownLogos.has(app.slug) && (opensApp(step, app.name) || !results[i].some((r) => r.ids.length))) {
+      image = logo(app)
+      shownLogos.add(app.slug)
+    } else {
+      for (const { keyword, ids } of results[i]) {
+        const id = ids.find((x) => !usedPictograms.has(x))
+        if (id !== undefined) {
+          usedPictograms.add(id)
+          image = { ...pictogram(id, keyword), ...(app ? { badge: { src: logo(app).src, alt: logo(app).alt } } : {}) }
+          break
+        }
+      }
+      if (app) shownLogos.add(app.slug)
+    }
+    return image ? { ...step, image } : step
+  })
 }

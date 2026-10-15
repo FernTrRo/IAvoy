@@ -15,8 +15,19 @@ export type Reminder = {
 }
 
 /** Imagen de apoyo de un paso: pictograma de ARASAAC o logotipo de la app (Simple Icons). */
-export type StepImage = { src: string; alt: string; kind: "pictogram" | "logo" }
-export type GuideStep = { title: string; body: string; image?: StepImage }
+export type StepImage = {
+  src: string
+  alt: string
+  kind: "pictogram" | "logo"
+  /** Logotipo pequeño en la esquina, para recordar en qué app está el paso. */
+  badge?: { src: string; alt: string }
+}
+/** Dónde está el botón en la pantalla. */
+export type StepPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "bottom-center" | "center"
+/** Pista visual del paso: qué botón buscar (ícono de interfaz) y dónde está. Ver src/lib/ui-hints.ts. */
+export type StepUi = { icon: string; position: StepPosition; app?: string }
+/** `image` es el formato anterior (pictogramas); las guías nuevas usan `ui`. */
+export type GuideStep = { title: string; body: string; ui?: StepUi; image?: StepImage }
 /** source "ai" = guía creada con IA (se guarda en el teléfono). */
 export type Guide = { id: string; title: string; steps: GuideStep[]; source?: "demo" | "ai"; createdAt?: string }
 

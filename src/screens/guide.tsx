@@ -12,6 +12,7 @@ import { defaultProfile } from "@/lib/profile"
 import { addGuide, findGuide, removeGuide, useGuides } from "@/lib/guides-store"
 import { aiAvailable } from "@/lib/ai"
 import { ARASAAC_CREDIT } from "@/lib/images"
+import { StepVisual } from "@/components/step-visual"
 import type { StepImage } from "@/data/demo"
 
 const guideLabels: Record<string, { title: string; subtitle: string; say: string; icon: typeof MessageCircle }> = {
@@ -146,7 +147,7 @@ function GuideLesson({ guide, step, onStep, onBack, onFinish }: GuideProps & { g
     <p className="lesson-topic">{guide.title}</p>
     <section className="lesson-page" aria-label={`Paso ${step + 1} de ${guide.steps.length}`}>
       <div className="lesson-position"><span>Ahora, solo esto</span><span>{String(step + 1).padStart(2, "0")} / {String(guide.steps.length).padStart(2, "0")}</span></div>
-      {current.image && <StepPicture key={current.image.src} image={current.image} />}
+      {current.ui ? <StepVisual key={step} ui={current.ui} /> : current.image && <StepPicture key={current.image.src} image={current.image} />}
       <h1>{current.title}</h1><p className="lesson-instruction">{current.body}</p>
       <div className="lesson-markers" aria-hidden="true">{guide.steps.map((_, i) => <span key={i} className={i <= step ? "reached" : ""} />)}</div>
       <button className="text-action lesson-repeat" onClick={() => void speak(spoken, { rate: 0.75 }).catch(() => {})}><RotateCcw aria-hidden="true" /> Escucharlo otra vez</button>
@@ -159,11 +160,12 @@ function GuideLesson({ guide, step, onStep, onBack, onFinish }: GuideProps & { g
   </div>
 }
 
-/** Imagen de apoyo del paso. Si no carga (sin internet), desaparece y queda solo el texto. */
+/** Imagen de apoyo del paso, con el logotipo de la app en la esquina si aplica. Si no carga (sin internet), desaparece. */
 function StepPicture({ image }: { image: StepImage }) {
   const [failed, setFailed] = useState(false)
+  const [badgeFailed, setBadgeFailed] = useState(false)
   if (failed) return null
-  return <figure className="mx-auto mb-4 grid w-full max-w-64 place-items-center rounded-2xl border-2 bg-white p-4">
+  return <figure className="relative mx-auto mb-4 grid w-full max-w-64 place-items-center rounded-2xl border-2 bg-white p-4">
     <img
       src={image.src}
       alt={image.alt}
@@ -171,5 +173,13 @@ function StepPicture({ image }: { image: StepImage }) {
       onError={() => setFailed(true)}
       className={image.kind === "logo" ? "size-32 object-contain" : "size-48 object-contain"}
     />
+    {image.badge && !badgeFailed && (
+      <img
+        src={image.badge.src}
+        alt={image.badge.alt}
+        onError={() => setBadgeFailed(true)}
+        className="absolute right-2 bottom-2 size-12 rounded-xl border-2 bg-white object-contain p-1.5"
+      />
+    )}
   </figure>
 }
