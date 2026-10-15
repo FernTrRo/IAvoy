@@ -11,6 +11,11 @@ import { speak } from "@/lib/voice"
 import { formatWhen } from "@/lib/format"
 import type { Reminder } from "@/data/demo"
 
+function newId() {
+  try { if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID() } catch { /* sigue abajo */ }
+  return `aviso-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 type Props = { initial?: Reminder; initialPhrase?: string; onCancel: () => void; onSave: (reminder: Reminder) => void }
 export function NewReminderScreen({ initial, initialPhrase, onCancel, onSave }: Props) {
   const [first] = useState(() => initialPhrase ? parseReminderRequest(initialPhrase) : { patch: {}, questions: [] })
@@ -36,7 +41,7 @@ export function NewReminderScreen({ initial, initialPhrase, onCancel, onSave }: 
       setQuestions([message]); void speak(message).catch(() => {}); return
     }
     if (!Number.isInteger(advance) || advance < 0 || advance > 10080 || !Number.isInteger(snooze) || snooze < 1 || snooze > 10080) { setQuestions(["Revisa los minutos: anticipación entre 0 y 10080; posposición entre 1 y 10080."]); return }
-    onSave({ id: initial?.id ?? crypto.randomUUID(), text: text.trim(), when: new Date(date).toISOString(), done: false, advanceMinutes: advance, recurrence, repeats, repeatSeconds: 30, snoozeMinutes: snooze })
+    onSave({ id: initial?.id ?? newId(), text: text.trim(), when: new Date(date).toISOString(), done: false, advanceMinutes: advance, recurrence, repeats, repeatSeconds: 30, snoozeMinutes: snooze })
   }
   function command(raw: string, written = false) {
     if (confirmCancel) {
